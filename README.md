@@ -480,6 +480,33 @@ To update them: run the dashboard, wait for a sweep to complete, then use your b
 
 ---
 
+## Development
+
+### Branch Strategy
+
+This project uses a branch-based development workflow:
+
+- **master** — stable production branch
+- **dev** — development branch for all new features and modifications
+
+**Workflow:**
+1. Make all changes on the `dev` branch
+2. Test thoroughly on `dev`
+3. Merge to `master` only after testing is complete
+
+**Setup:**
+```bash
+# Already configured - dev branch exists with upstream tracking
+git checkout dev    # Switch to development branch
+git push            # Pushes to origin/dev by default
+```
+
+### Recent Updates
+
+- **2025-03-17**: Created `dev` branch, configured upstream tracking, updated remote repository URL to `git@github.com:yuanguangshan/Crucix.git`
+
+---
+
 ## Contributing
 
 Found a bug? Want to add a 28th source? PRs welcome. Each source is a standalone module in `apis/sources/` — just export a `briefing()` function that returns structured data and add it to the orchestrator in `apis/briefing.mjs`.
