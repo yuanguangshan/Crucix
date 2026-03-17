@@ -470,6 +470,17 @@ export async function synthesize(data) {
       changePct: yfQuotes['^VIX'].changePct,
     } : null,
     timestamp: yfData.summary?.timestamp || null,
+    // Full data for expand/collapse
+    all: {
+      indexes: (yfData.all?.indexes || []).map(q => ({
+        symbol: q.symbol, name: q.name, price: q.price,
+        change: q.change, changePct: q.changePct, history: q.history || []
+      })),
+      commodities: (yfData.all?.commodities || []).map(q => ({
+        symbol: q.symbol, name: q.name, price: q.price,
+        change: q.change, changePct: q.changePct, history: q.history || []
+      })),
+    },
   };
 
   // Override stale EIA prices with live Yahoo Finance data if available

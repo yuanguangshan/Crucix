@@ -711,21 +711,21 @@
       }
       .mc .ml {
         font-family: var(--mono);
-        font-size: 9px;
+        font-size: 11px;
         text-transform: uppercase;
         letter-spacing: 0.08em;
         color: var(--dim);
       }
       .mc .mv {
         font-family: var(--mono);
-        font-size: 18px;
+        font-size: 20px;
         font-weight: 600;
         margin-top: 6px;
         display: block;
       }
       .mc .ms {
         font-family: var(--mono);
-        font-size: 9px;
+        font-size: 10px;
         color: var(--dim);
         margin-top: 4px;
         display: block;
@@ -1340,6 +1340,36 @@
         color: var(--dim);
         margin-left: 6px;
       }
+
+      /* MARKET EXPAND/COLLAPSE */
+      .market-expand-btn {
+        font-family: var(--mono);
+        font-size: 9px;
+        color: var(--dim);
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 3px 8px;
+        margin-left: 6px;
+        cursor: pointer;
+        border-radius: 2px;
+        transition: all 0.2s;
+      }
+      .market-expand-btn:hover {
+        background: rgba(100, 240, 200, 0.1);
+        border-color: rgba(100, 240, 200, 0.3);
+        color: var(--accent);
+      }
+      .market-expand-btn::after {
+        content: '▼';
+        font-size: 8px;
+        margin-left: 3px;
+      }
+      .market-expand-btn.expanded::after {
+        content: '▲';
+      }
+      .market-expand-hidden {
+        display: none;
+      }
     </style>
   </head>
   <body>
@@ -1418,6 +1448,35 @@
       </div>
     </div>
     <script>
+      // === MARKET EXPAND/COLLAPSE ===
+      function toggleMarketExpand(type, event) {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const hiddenDiv = document.getElementById(`${type}-hidden`);
+        const hiddenRow = document.getElementById(`${type}-hidden-row`);
+        const btn = event.target;
+
+        if (!hiddenDiv || !hiddenRow) return;
+
+        const isExpanded = btn.classList.contains('expanded');
+
+        if (isExpanded) {
+          // Collapse
+          hiddenDiv.style.display = 'none';
+          hiddenRow.style.display = 'none';
+          btn.classList.remove('expanded');
+          const count = hiddenDiv.querySelectorAll('.mc').length;
+          btn.innerHTML = `+${count} more`;
+        } else {
+          // Expand
+          hiddenRow.innerHTML = hiddenDiv.innerHTML;
+          hiddenRow.style.display = 'grid';
+          btn.classList.add('expanded');
+          btn.innerHTML = 'Show less';
+        }
+      }
+
       // === DATA ===
       let D = null;
       // === GLOBALS ===
@@ -2683,10 +2742,33 @@
         };
 
         // Build live market cards from Yahoo Finance
-        const indexCards = (mkt.indexes || []).map(mktCard).join("");
+        const allIndexes = mkt.all?.indexes || mkt.indexes || [];
+        const allCommodities = mkt.all?.commodities || mkt.commodities || [];
+        const indexesToShow = (mkt.indexes || []);
+        const commoditiesToShow = (mkt.commodities || []);
+
+        // Generate index cards with expand/collapse
+        const indexCards = indexesToShow.map(mktCard).join("");
+        const indexCardsHidden = allIndexes.slice(indexesToShow.length).map(mktCard).join("");
+        const indexExpandHtml = allIndexes.length > indexesToShow.length
+          ? `<button class="market-expand-btn" onclick="toggleMarketExpand('indexes', event)">
+             +${allIndexes.length - indexesToShow.length} more
+           </button>
+           <div class="market-expand-hidden" id="indexes-hidden">${indexCardsHidden}</div>`
+          : "";
+
+        // Generate commodity cards with expand/collapse
+        const commodityCards = commoditiesToShow.map(mktCard).join("");
+        const commodityCardsHidden = allCommodities.slice(commoditiesToShow.length).map(mktCard).join("");
+        const commodityExpandHtml = allCommodities.length > commoditiesToShow.length
+          ? `<button class="market-expand-btn" onclick="toggleMarketExpand('commodities', event)">
+             +${allCommodities.length - commoditiesToShow.length} more
+           </button>
+           <div class="market-expand-hidden" id="commodities-hidden">${commodityCardsHidden}</div>`
+          : "";
+
         const cryptoCards = (mkt.crypto || []).map(mktCard).join("");
         const rateCards = (mkt.rates || []).map(mktCard).join("");
-        const commodityCards = (mkt.commodities || []).map(mktCard).join("");
         const hasMarkets = indexCards || cryptoCards || commodityCards;
 
         const srcHtml = D.health
@@ -2814,21 +2896,23 @@
       ${
         hasMarkets
           ? `<div style="margin-bottom:8px">
-        <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-bottom:4px;letter-spacing:1px">INDEXES</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:4px;letter-spacing:1px">INDEXES${indexExpandHtml}</div>
         <div class="metrics-row">${indexCards}</div>
+        <div class="metrics-row" id="indexes-hidden-row" style="display:none"></div>
       </div>
       <div style="margin-bottom:8px">
-        <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-bottom:4px;letter-spacing:1px">CRYPTO</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:4px;letter-spacing:1px">CRYPTO</div>
         <div class="metrics-row">${cryptoCards}</div>
       </div>
       <div style="margin-bottom:8px">
-        <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-bottom:4px;letter-spacing:1px">COMMODITIES</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:4px;letter-spacing:1px">COMMODITIES${commodityExpandHtml}</div>
         <div class="metrics-row">${commodityCards}</div>
+        <div class="metrics-row" id="commodities-hidden-row" style="display:none"></div>
       </div>`
           : ""
       }
       <div style="margin-bottom:8px">
-        <div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-bottom:4px;letter-spacing:1px">ENERGY + MACRO</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:4px;letter-spacing:1px">ENERGY + MACRO</div>
         <div class="metrics-row">${metrics
           .map((m) => {
             const sparkSvg = m.spark ? mkSparkSvg(m.spark, m.sparkUp) : "";
@@ -2837,7 +2921,7 @@
           .join("")}</div>
       </div>
       <div style="margin-top:6px">
-        <div style="font-family:var(--mono);font-size:10px;color:var(--dim);margin-bottom:4px">WTI 5-DAY</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:4px">WTI 5-DAY</div>
         <div class="spark">${sparkHtml}</div>
       </div>
     </div>

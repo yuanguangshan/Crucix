@@ -141,6 +141,19 @@ export async function collect() {
   }
 
   // Categorize for easy dashboard consumption
+  const allIndexes = pickGroup(quotes, [
+    'SPY', 'QQQ', 'DIA', 'IWM',
+    '^FTSE', '^GDAXI', '^FCHI', '^STOXX',
+    '^N225', '^HSI', '000001.SS', '^KS11', '^AXJO', '^BSESN',
+    '^GSPTSE', '^BVSP'
+  ]);
+  const allCommodities = pickGroup(quotes, [
+    'GC=F', 'SI=F', 'HG=F', 'PL=F', 'PA=F',
+    'CL=F', 'BZ=F', 'NG=F', 'HO=F', 'RB=F',
+    'ZC=F', 'ZW=F', 'ZS=F', 'KC=F', 'SB=F', 'CC=F', 'CT=F',
+    'LC=F', 'LH=F', 'FC=F', 'OJ=F', 'RR=F'
+  ]);
+
   return {
     quotes,
     summary: {
@@ -149,14 +162,15 @@ export async function collect() {
       failed,
       timestamp: new Date().toISOString(),
     },
-    indexes: pickGroup(quotes, [
+    // Limited display (6 items max per category)
+    indexes: pickGroupLimit(quotes, [
       'SPY', 'QQQ', 'DIA', 'IWM',
       '^FTSE', '^GDAXI', '^FCHI', '^STOXX',
       '^N225', '^HSI', '000001.SS', '^KS11', '^AXJO', '^BSESN',
       '^GSPTSE', '^BVSP'
     ]),
     rates: pickGroup(quotes, ['TLT', 'HYG', 'LQD']),
-    commodities: pickGroup(quotes, [
+    commodities: pickGroupLimit(quotes, [
       'GC=F', 'SI=F', 'HG=F', 'PL=F', 'PA=F',
       'CL=F', 'BZ=F', 'NG=F', 'HO=F', 'RB=F',
       'ZC=F', 'ZW=F', 'ZS=F', 'KC=F', 'SB=F', 'CC=F', 'CT=F',
@@ -164,9 +178,19 @@ export async function collect() {
     ]),
     crypto: pickGroup(quotes, ['BTC-USD', 'ETH-USD']),
     volatility: pickGroup(quotes, ['^VIX']),
+    // Full data for expansion
+    all: {
+      indexes: allIndexes,
+      commodities: allCommodities,
+    },
   };
 }
 
 function pickGroup(quotes, symbols) {
   return symbols.map(s => quotes[s]).filter(Boolean);
+}
+
+// Pick first N items for default display
+function pickGroupLimit(quotes, symbols, limit = 6) {
+  return pickGroup(quotes, symbols).slice(0, limit);
 }
