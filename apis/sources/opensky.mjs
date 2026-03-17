@@ -8,22 +8,33 @@
 
 import { safeFetch } from '../utils/fetch.mjs';
 import { readFileSync } from 'fs';
+import '../utils/env.mjs'; // Load .env file
 
 const BASE = 'https://opensky-network.org/api';
 
-// Load OpenSky credentials from credentials.json
+// Load OpenSky credentials from environment variables or credentials.json
 let CREDENTIALS = null;
-try {
-  const credPath = '/Users/ygs/Downloads/credentials.json';
-  const creds = JSON.parse(readFileSync(credPath, 'utf-8'));
-  // Support both formats: clientId/clientSecret and username/password
+
+// First try environment variables
+if (process.env.OPENSKY_USERNAME && process.env.OPENSKY_PASSWORD) {
   CREDENTIALS = {
-    username: creds.username || creds.clientId,
-    password: creds.password || creds.clientSecret
+    username: process.env.OPENSKY_USERNAME,
+    password: process.env.OPENSKY_PASSWORD
   };
-  console.log('[OpenSky] Using authenticated mode (8,000 req/day)');
-} catch (e) {
-  console.warn('[OpenSky] No credentials found, running in anonymous mode (4,000 req/day)');
+  console.log('[OpenSky] Using authenticated mode from env (8,000 req/day)');
+} else {
+  // Fallback to credentials.json file
+  try {
+    const credPath = process.env.OPENSKY_CREDENTIALS_PATH || '/Users/ygs/Downloads/credentials.json';
+    const creds = JSON.parse(readFileSync(credPath, 'utf-8'));
+    CREDENTIALS = {
+      username: creds.username || creds.clientId,
+      password: creds.password || creds.clientSecret
+    };
+    console.log('[OpenSky] Using authenticated mode from file (8,000 req/day)');
+  } catch (e) {
+    console.warn('[OpenSky] No credentials found, running in anonymous mode (4,000 req/day)');
+  }
 }
 
 // Simple in-memory cache (60 seconds TTL)
