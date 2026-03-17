@@ -10,6 +10,7 @@ export default {
     provider: process.env.LLM_PROVIDER || null, // anthropic | openai | gemini | codex
     apiKey: process.env.LLM_API_KEY || null,
     model: process.env.LLM_MODEL || null,
+    baseURL: process.env.LLM_BASE_URL || null, // Custom base URL for OpenAI-compatible APIs
   },
 
   telegram: {
