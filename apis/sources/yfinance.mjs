@@ -8,11 +8,26 @@ const BASE = 'https://query1.finance.yahoo.com/v8/finance/chart';
 
 // Symbols to track — covers broad market, rates, commodities, crypto, volatility
 const SYMBOLS = {
-  // Indexes / ETFs
+  // Indexes / ETFs — US
   SPY: 'S&P 500',
   QQQ: 'Nasdaq 100',
   DIA: 'Dow Jones',
   IWM: 'Russell 2000',
+  // Indexes — Europe
+  '^FTSE': 'FTSE 100',
+  '^GDAXI': 'DAX',
+  '^FCHI': 'CAC 40',
+  '^STOXX': 'STOXX 600',
+  // Indexes — Asia-Pacific
+  '^N225': 'Nikkei 225',
+  '^HSI': 'Hang Seng',
+  '000001.SS': 'Shanghai',
+  '^KS11': 'KOSPI',
+  '^AXJO': 'S&P/ASX 200',
+  '^BSESN': 'Sensex',
+  // Indexes — Americas
+  '^GSPTSE': 'TSX',
+  '^BVSP': 'Bovespa',
   // Rates / Credit
   TLT: '20Y+ Treasury',
   HYG: 'High Yield Corp',
@@ -20,9 +35,26 @@ const SYMBOLS = {
   // Commodities
   'GC=F': 'Gold',
   'SI=F': 'Silver',
+  'HG=F': 'Copper',
+  'PL=F': 'Platinum',
+  'PA=F': 'Palladium',
   'CL=F': 'WTI Crude',
   'BZ=F': 'Brent Crude',
   'NG=F': 'Natural Gas',
+  'HO=F': 'Heating Oil',
+  'RB=F': 'RBOB Gasoline',
+  'ZC=F': 'Corn',
+  'ZW=F': 'Wheat',
+  'ZS=F': 'Soybeans',
+  'KC=F': 'Coffee',
+  'SB=F': 'Sugar',
+  'CC=F': 'Cocoa',
+  'CT=F': 'Cotton',
+  'LC=F': 'Live Cattle',
+  'LH=F': 'Lean Hogs',
+  'FC=F': 'Feeder Cattle',
+  'OJ=F': 'Orange Juice',
+  'RR=F': 'Rough Rice',
   // Crypto
   'BTC-USD': 'Bitcoin',
   'ETH-USD': 'Ethereum',
@@ -117,9 +149,19 @@ export async function collect() {
       failed,
       timestamp: new Date().toISOString(),
     },
-    indexes: pickGroup(quotes, ['SPY', 'QQQ', 'DIA', 'IWM']),
+    indexes: pickGroup(quotes, [
+      'SPY', 'QQQ', 'DIA', 'IWM',
+      '^FTSE', '^GDAXI', '^FCHI', '^STOXX',
+      '^N225', '^HSI', '000001.SS', '^KS11', '^AXJO', '^BSESN',
+      '^GSPTSE', '^BVSP'
+    ]),
     rates: pickGroup(quotes, ['TLT', 'HYG', 'LQD']),
-    commodities: pickGroup(quotes, ['GC=F', 'SI=F', 'CL=F', 'BZ=F', 'NG=F']),
+    commodities: pickGroup(quotes, [
+      'GC=F', 'SI=F', 'HG=F', 'PL=F', 'PA=F',
+      'CL=F', 'BZ=F', 'NG=F', 'HO=F', 'RB=F',
+      'ZC=F', 'ZW=F', 'ZS=F', 'KC=F', 'SB=F', 'CC=F', 'CT=F',
+      'LC=F', 'LH=F', 'FC=F', 'OJ=F', 'RR=F'
+    ]),
     crypto: pickGroup(quotes, ['BTC-USD', 'ETH-USD']),
     volatility: pickGroup(quotes, ['^VIX']),
   };

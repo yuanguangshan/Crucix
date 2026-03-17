@@ -220,12 +220,30 @@ export function generateIdeas(V2) {
       type: 'long', confidence: 'High', horizon: 'strategic'
     });
   }
-  const totalThermal = V2.thermal.reduce((s, t) => s + t.det, 0);
   if (totalThermal > 30000 && V2.tg.urgent.length > 2) {
     ideas.push({
       title: 'Satellite Confirms Conflict Intensity',
       text: `${totalThermal.toLocaleString()} thermal detections + ${V2.tg.urgent.length} urgent OSINT flags. Defense sector procurement may accelerate.`,
       type: 'watch', confidence: 'Medium', horizon: 'swing'
+    });
+  }
+
+  // Commodities Momentum
+  const gold = (V2.markets?.commodities || []).find(c => c.symbol === 'GC=F');
+  if (gold && Math.abs(gold.changePct) > 1.5) {
+    ideas.push({
+      title: gold.changePct > 0 ? 'Gold Breakout / Safe Haven Demand' : 'Gold Under Pressure',
+      text: `Gold moved ${gold.changePct}% to $${gold.price}. ${gold.changePct > 0 ? 'Geopolitical anxiety or currency debasement fears rising.' : 'Risk appetite returning or dollar strength capping upside.'}`,
+      type: gold.changePct > 0 ? 'long' : 'short', confidence: 'Medium', horizon: 'tactical'
+    });
+  }
+
+  const copper = (V2.markets?.commodities || []).find(c => c.symbol === 'HG=F');
+  if (copper && Math.abs(copper.changePct) > 2.0) {
+    ideas.push({
+      title: copper.changePct > 0 ? 'Dr. Copper Signaling Growth' : 'Copper Warning on Growth',
+      text: `Copper moved ${copper.changePct}% to $${copper.price}. ${copper.changePct > 0 ? 'Industrial demand indicates global manufacturing expansion.' : 'Weakness may signal a slowdown in global industrial activity.'}`,
+      type: copper.changePct > 0 ? 'long' : 'watch', confidence: 'Medium', horizon: 'swing'
     });
   }
 
