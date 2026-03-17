@@ -1,9 +1,9 @@
 // ADS-B Exchange — Unfiltered Flight Tracking (including Military)
 // Unlike FlightRadar24/FlightAware, ADS-B Exchange does NOT filter military aircraft.
-// Public feed access varies; RapidAPI tier available for programmatic use.
-// This module attempts the public endpoints and falls back to a documented stub.
+// RapidAPI provides programmatic access with dedicated /mil endpoint for military aircraft.
 
 import { safeFetch } from '../utils/fetch.mjs';
+import '../utils/env.mjs'; // Load .env file
 
 // Known endpoints (availability may change)
 const ENDPOINTS = {
@@ -14,6 +14,11 @@ const ENDPOINTS = {
   // Alternative: aircraft within bounding box
   publicTrace: 'https://globe.adsbexchange.com/data/traces',
 };
+
+// Simple in-memory cache (60 seconds TTL)
+let cachedData = null;
+let cacheTimestamp = 0;
+const CACHE_TTL = 60000; // 60 seconds
 
 // Known military aircraft types and ICAO type designators
 const MILITARY_TYPES = {
@@ -208,91 +213,131 @@ export async function getAircraftInArea(lat, lon, radiusNm = 250, apiKey) {
 // Briefing — attempt to get military flight data, document what's available
 export async function briefing() {
   const apiKey = process.env.ADSB_API_KEY || process.env.RAPIDAPI_KEY || null;
-  const militaryAircraft = await getMilitaryAircraft(apiKey);
 
-  // If we got data, analyze it
-  if (militaryAircraft && militaryAircraft.length > 0) {
-    // Group by military match type
-    const byCountry = {};
-    const reconAircraft = [];
-    const bombers = [];
-    const tankers = [];
-    const vipTransport = [];
-
-    for (const ac of militaryAircraft) {
-      const country = ac.militaryMatch || 'Unknown';
-      byCountry[country] = (byCountry[country] || 0) + 1;
-
-      const desc = (ac.typeDescription || '').toLowerCase();
-      if (desc.includes('sigint') || desc.includes('awacs') || desc.includes('patrol') ||
-          desc.includes('global hawk') || desc.includes('dragon lady') || desc.includes('jstars')) {
-        reconAircraft.push(ac);
-      } else if (desc.includes('stratofortress') || desc.includes('lancer') || desc.includes('spirit')) {
-        bombers.push(ac);
-      } else if (desc.includes('tanker') || desc.includes('extender') || desc.includes('pegasus')) {
-        tankers.push(ac);
-      } else if (desc.includes('air force one') || desc.includes('nightwatch') ||
-                 desc.includes('air force two') || desc.includes('special air')) {
-        vipTransport.push(ac);
-      }
-    }
-
-    const signals = [];
-    if (reconAircraft.length > 5) {
-      signals.push(`HIGH ISR ACTIVITY: ${reconAircraft.length} reconnaissance/surveillance aircraft airborne`);
-    }
-    if (bombers.length > 0) {
-      signals.push(`BOMBERS AIRBORNE: ${bombers.length} strategic bombers detected`);
-    }
-    if (tankers.length > 8) {
-      signals.push(`ELEVATED TANKER OPS: ${tankers.length} aerial refueling aircraft active (possible surge)`);
-    }
-    if (vipTransport.length > 0) {
-      signals.push(`VIP AIRCRAFT: ${vipTransport.length} VIP/continuity-of-government aircraft airborne`);
-    }
-
+  if (!apiKey) {
     return {
       source: 'ADS-B Exchange',
       timestamp: new Date().toISOString(),
-      status: 'live',
-      totalMilitary: militaryAircraft.length,
-      byCountry,
-      categories: {
-        reconnaissance: reconAircraft.slice(0, 20),
-        bombers: bombers.slice(0, 10),
-        tankers: tankers.slice(0, 10),
-        vipTransport: vipTransport.slice(0, 5),
-      },
-      militaryAircraft: militaryAircraft.slice(0, 50), // cap for briefing size
-      signals: signals.length > 0 ? signals : ['Military flight activity within normal patterns'],
+      status: 'no_key',
+      hotspots: [],
+      message: 'No ADSB_API_KEY configured. Add to .env for military tracking.',
     };
   }
 
-  // No data available — return stub with integration documentation
+  const now = Date.now();
+  const useCache = cachedData && (now - cacheTimestamp) < CACHE_TTL;
+
+  let allAircraft = [];
+  let isRateLimited = false;
+
+  if (useCache) {
+    allAircraft = cachedData.allAircraft || [];
+    console.log('[ADS-B] Using cached data (' + Math.round((now - cacheTimestamp) / 1000) + 's old)');
+  } else {
+    // Fetch all aircraft via RapidAPI
+    try {
+      const data = await safeFetch(`${ENDPOINTS.rapidApi}/mil`, {
+        timeout: 20000,
+        headers: {
+          'X-RapidAPI-Key': apiKey,
+          'X-RapidAPI-Host': 'adsbexchange-com1.p.rapidapi.com',
+        },
+      });
+
+      if (data?.error) {
+        if (data.error.includes('429') || data.error.includes('Too many')) {
+          console.warn('[ADS-B] Rate limited - using cached data');
+          isRateLimited = true;
+          allAircraft = cachedData?.allAircraft || [];
+        } else {
+          console.error('[ADS-B] API error:', data.error);
+          allAircraft = cachedData?.allAircraft || [];
+        }
+      } else {
+        allAircraft = (data.ac || data.aircraft || []).map(classifyAircraft);
+        cachedData = { allAircraft, timestamp: now };
+        cacheTimestamp = now;
+        console.log('[ADS-B] Fetched', allAircraft.length, 'aircraft');
+      }
+    } catch (e) {
+      console.error('[ADS-B] Fetch error:', e.message);
+      allAircraft = cachedData?.allAircraft || [];
+    }
+  }
+
+  // Filter by hotspot regions
+  const hotspots = getHotspotData(allAircraft);
+
   return {
     source: 'ADS-B Exchange',
     timestamp: new Date().toISOString(),
-    status: apiKey ? 'error' : 'no_key',
-    militaryAircraft: [],
-    message: apiKey
-      ? 'ADS-B Exchange API returned no data. The endpoint may be temporarily unavailable.'
-      : 'No ADS-B Exchange API key configured. Set ADSB_API_KEY for military flight tracking.',
-    signals: ['ADS-B data unavailable — cannot assess military flight activity'],
-    integrationGuide: {
-      step1: 'Sign up at https://rapidapi.com/adsbexchange/api/adsbexchange-com1',
-      step2: 'Subscribe to the free tier (500 requests/month)',
-      step3: 'Set ADSB_API_KEY=<your-rapidapi-key> in .env',
-      features: [
-        'Unfiltered military aircraft tracking (unlike FlightRadar24)',
-        'Real-time position, altitude, speed, heading',
-        'ICAO hex code identification for military registrations',
-        'Geographic area search within radius',
-        'Dedicated /mil endpoint for military-only feed',
-      ],
+    status: 'live',
+    hotspots,
+    metadata: {
+      totalAircraftGlobal: allAircraft.length,
+      usingCache: useCache,
+      cacheAge: useCache ? Math.round((now - cacheTimestamp) / 1000) : 0,
+      rateLimited: isRateLimited,
     },
-    complementarySource: 'OpenSky (opensky.mjs) provides partial military coverage for free',
-    knownMilitaryTypes: MILITARY_TYPES,
   };
+}
+
+// Get hotspot regional data
+function getHotspotData(aircraft) {
+  const HOTSPOTS = [
+    { name: 'Middle East', lat: 27, lon: 45, radius: 1200 },
+    { name: 'Taiwan Strait', lat: 24, lon: 120, radius: 400 },
+    { name: 'Ukraine Region', lat: 48, lon: 31, radius: 500 },
+    { name: 'Baltic Region', lat: 56, lon: 24, radius: 400 },
+    { name: 'South China Sea', lat: 14, lon: 113, radius: 600 },
+    { name: 'Korean Peninsula', lat: 38, lon: 128, radius: 400 },
+  ];
+
+  return HOTSPOTS.map(region => {
+    const inRegion = aircraft.filter(ac => {
+      if (!ac.latitude || !ac.longitude) return false;
+      const dist = calculateDistance(
+        region.lat, region.lon,
+        ac.latitude, ac.longitude
+      );
+      return dist <= region.radius;
+    });
+
+    const military = inRegion.filter(ac => ac.isMilitary);
+    const byCountry = {};
+
+    for (const ac of inRegion) {
+      const country = ac.militaryMatch || 'Unknown';
+      byCountry[country] = (byCountry[country] || 0) + 1;
+    }
+
+    return {
+      region: region.name,
+      totalAircraft: inRegion.length,
+      militaryAircraft: military.length,
+      byCountry,
+      topAircraft: inRegion.slice(0, 5).map(ac => ({
+        hex: ac.hex,
+        callsign: ac.callsign,
+        type: ac.typeDescription || ac.type,
+        altitude: ac.altitude,
+        speed: ac.speed,
+        isMilitary: ac.isMilitary,
+      })),
+    };
+  });
+}
+
+// Calculate distance between two lat/lon points (nautical miles)
+function calculateDistance(lat1, lon1, lat2, lon2) {
+  const R = 3440.1; // Earth's radius in nautical miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
 }
 
 // Run standalone
