@@ -43,6 +43,9 @@ import { briefing as space } from './sources/space.mjs';
 // === Tier 5: Live Market Data ===
 import { briefing as yfinance } from './sources/yfinance.mjs';
 
+// === Tier 6: Chinese Financial News ===
+import { briefing as wallstreetcn } from './sources/wallstreetcn.mjs';
+
 export async function runSource(name, fn, ...args) {
   const start = Date.now();
   try {
@@ -94,6 +97,9 @@ export async function fullBriefing() {
 
     // Tier 5: Live Market Data
     runSource('YFinance', yfinance),
+
+    // Tier 6: Chinese Financial News
+    runSource('WallStreetCN', wallstreetcn),
   ]);
 
   const sources = results.map(r => r.status === 'fulfilled' ? r.value : { status: 'failed', error: r.reason?.message });

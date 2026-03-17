@@ -424,6 +424,22 @@ export async function synthesize(data) {
     topTitles: (gdeltData.allArticles || []).slice(0, 5).map(a => a.title?.substring(0, 80))
   };
 
+  // Wall Street CN (华尔街见闻) Chinese financial news
+  const wscnData = data.sources.WallStreetCN || {};
+  const wallstreetcn = {
+    totalItems: wscnData.totalItems || 0,
+    markets: (wscnData.markets || []).length,
+    forex: (wscnData.forex || []).length,
+    commodities: (wscnData.commodities || []).length,
+    centralBanks: (wscnData.centralBanks || []).length,
+    important: (wscnData.important || []).slice(0, 5).map(i => ({
+      title: i.title?.substring(0, 100),
+      date: i.date,
+      vip: i.vip
+    })),
+    topTitles: (wscnData.items || []).slice(0, 5).map(i => i.title?.substring(0, 80))
+  };
+
   const health = Object.entries(data.sources).map(([name, src]) => ({
     n: name, err: Boolean(src.error), stale: Boolean(src.stale)
   }));
@@ -472,18 +488,18 @@ export async function synthesize(data) {
     meta: data.crucix, air, thermal, tSignals, chokepoints, nuke, nukeSignals,
     sdr: { total: sdrNet.totalReceivers || 0, online: sdrNet.online || 0, zones: sdrZones },
     tg: { posts: tgData.totalPosts || 0, urgent: tgUrgent, topPosts: tgTop },
-    who, fred, energy, bls, treasury, gscpi, defense, noaa, acled, gdelt, space, health, news,
+    who, fred, energy, bls, treasury, gscpi, defense, noaa, acled, gdelt, wallstreetcn, space, health, news,
     markets, // Live Yahoo Finance market data
     ideas: [], ideasSource: 'disabled',
-    // newsFeed for ticker (merged RSS + GDELT + Telegram)
-    newsFeed: buildNewsFeed(news, gdeltData, tgUrgent, tgTop),
+    // newsFeed for ticker (merged RSS + GDELT + Telegram + WallStreetCN)
+    newsFeed: buildNewsFeed(news, gdeltData, tgUrgent, tgTop, wscnData),
   };
 
   return V2;
 }
 
 // === Unified News Feed for Ticker ===
-function buildNewsFeed(rssNews, gdeltData, tgUrgent, tgTop) {
+function buildNewsFeed(rssNews, gdeltData, tgUrgent, tgTop, wscnData) {
   const feed = [];
 
   // RSS news
@@ -501,6 +517,21 @@ function buildNewsFeed(rssNews, gdeltData, tgUrgent, tgTop) {
       feed.push({
         headline: a.title.substring(0, 100), source: 'GDELT', type: 'gdelt',
         timestamp: new Date().toISOString(), region: geo?.region || 'Global', urgent: false, url: sanitizeExternalUrl(a.url)
+      });
+    }
+  }
+
+  // Wall Street CN (华尔街见闻) - Chinese financial news
+  for (const i of (wscnData?.items || []).slice(0, 15)) {
+    if (i.title) {
+      feed.push({
+        headline: i.title.substring(0, 100),
+        source: '华尔街见闻',
+        type: 'wscn',
+        timestamp: i.date || new Date().toISOString(),
+        region: 'China/Global',
+        urgent: i.important || false,
+        url: i.url
       });
     }
   }
