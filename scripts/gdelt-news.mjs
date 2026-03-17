@@ -1,7 +1,3 @@
-
-
-
-
 // gdelt-news-standalone.mjs
 // 完全独立版本，不依赖Crucix项目文件
 // 使用方式: node gdelt-news-standalone.mjs "你的关键词" [选项]
