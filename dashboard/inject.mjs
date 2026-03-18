@@ -345,6 +345,8 @@ export async function synthesize(data) {
     const uaTotal = randPct(64, 0.35);
     const balTotal = randPct(42, 0.40);
     const krTotal = randPct(58, 0.30);
+    const usWestTotal = randPct(95, 0.30);
+    const usEastTotal = randPct(110, 0.25);
 
     air = [
       {
@@ -415,6 +417,34 @@ export async function synthesize(data) {
           ['Japan', rand(6, 14)],
           ['North Korea', rand(5, 10)],
           ['China', rand(3, 8)]
+        ]
+      },
+      {
+        region: 'US West Coast (SIMULATED)',
+        total: usWestTotal,
+        noCallsign: rand(15, 30),
+        highAlt: rand(25, 45),
+        simulated: true,
+        top: [
+          ['United States', rand(60, 85)],
+          ['Canada', rand(8, 15)],
+          ['Mexico', rand(3, 8)],
+          ['China', rand(2, 6)],
+          ['Japan', rand(2, 5)]
+        ]
+      },
+      {
+        region: 'US East Coast (SIMULATED)',
+        total: usEastTotal,
+        noCallsign: rand(12, 25),
+        highAlt: rand(20, 40),
+        simulated: true,
+        top: [
+          ['United States', rand(70, 95)],
+          ['Canada', rand(10, 18)],
+          ['United Kingdom', rand(5, 12)],
+          ['Germany', rand(3, 8)],
+          ['France', rand(2, 6)]
         ]
       },
     ];
