@@ -33,6 +33,7 @@ const DEFAULT_CHANNELS = [
   // === Markets & Finance ===
   { id: 'WallStreetSilver',  label: 'Wall St Silver',      topic: 'finance',     note: 'Commodities and macro commentary' },
   { id: 'unusual_whales',    label: 'Unusual Whales',      topic: 'finance',     note: 'Market flow and options analysis' },
+  { id: 'jin10shandian',      label: '金十数据',            topic: 'finance',     note: 'Chinese financial news and market data' },
 ];
 
 // Allow user to add custom channels via env var
