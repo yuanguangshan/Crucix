@@ -2844,6 +2844,13 @@
         const allEscalated = (delta.signals?.escalated || []);
         const allDeescalated = (delta.signals?.deescalated || []);
 
+        // Sort new signals by date (most recent first)
+        allNew.sort((a, b) => {
+          const dateA = a.date ? new Date(a.date).getTime() : 0;
+          const dateB = b.date ? new Date(b.date).getTime() : 0;
+          return dateB - dateA; // Descending: newest first
+        });
+
         // Show up to 8 new signals (they're most important), then fill with others to reach ~12 total
         const newSigs = allNew.slice(0, 8);
         const remainingSlots = Math.max(0, 12 - newSigs.length);
