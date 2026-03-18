@@ -327,11 +327,98 @@ export function generateIdeas(V2) {
 
 // === Synthesize raw sweep data into dashboard format ===
 export async function synthesize(data) {
-  const air = (data.sources.OpenSky?.hotspots || []).map(h => ({
+  let air = (data.sources.OpenSky?.hotspots || []).map(h => ({
     region: h.region, total: h.totalAircraft || 0, noCallsign: h.noCallsign || 0,
     highAlt: h.highAltitude || 0,
     top: Object.entries(h.byCountry || {}).sort((a, b) => b[1] - a[1]).slice(0, 5)
   }));
+
+  // Add mock data if no air activity detected
+  if (air.length === 0 || air.every(a => a.total === 0)) {
+    // Random variation helper
+    const rand = (min, max) => Math.floor(Math.random() * (max - min + 1)) + min;
+    const randPct = (base, pct) => base + Math.floor(base * (Math.random() * pct * 2 - pct));
+
+    // Generate varied mock data
+    const meTotal = randPct(145, 0.25);
+    const twTotal = randPct(87, 0.30);
+    const uaTotal = randPct(64, 0.35);
+    const balTotal = randPct(42, 0.40);
+    const krTotal = randPct(58, 0.30);
+
+    air = [
+      {
+        region: 'Middle East (SIMULATED)',
+        total: meTotal,
+        noCallsign: rand(8, 18),
+        highAlt: rand(30, 50),
+        simulated: true,
+        top: [
+          ['United States', rand(35, 50)],
+          ['Israel', rand(22, 35)],
+          ['Saudi Arabia', rand(15, 25)],
+          ['Turkey', rand(10, 20)],
+          ['Egypt', rand(8, 15)]
+        ]
+      },
+      {
+        region: 'Taiwan Strait (SIMULATED)',
+        total: twTotal,
+        noCallsign: rand(5, 12),
+        highAlt: rand(18, 28),
+        simulated: true,
+        top: [
+          ['United States', rand(25, 38)],
+          ['Taiwan', rand(18, 30)],
+          ['Japan', rand(8, 16)],
+          ['South Korea', rand(6, 12)],
+          ['Philippines', rand(4, 10)]
+        ]
+      },
+      {
+        region: 'Ukraine Region (SIMULATED)',
+        total: uaTotal,
+        noCallsign: rand(12, 25),
+        highAlt: rand(10, 22),
+        simulated: true,
+        top: [
+          ['Ukraine', rand(18, 28)],
+          ['Russia', rand(14, 24)],
+          ['Poland', rand(6, 12)],
+          ['Romania', rand(4, 10)],
+          ['Germany', rand(3, 8)]
+        ]
+      },
+      {
+        region: 'Baltic Region (SIMULATED)',
+        total: balTotal,
+        noCallsign: rand(4, 10),
+        highAlt: rand(8, 16),
+        simulated: true,
+        top: [
+          ['Russia', rand(10, 18)],
+          ['Germany', rand(6, 12)],
+          ['Sweden', rand(5, 10)],
+          ['Finland', rand(4, 9)],
+          ['Poland', rand(3, 8)]
+        ]
+      },
+      {
+        region: 'Korean Peninsula (SIMULATED)',
+        total: krTotal,
+        noCallsign: rand(3, 10),
+        highAlt: rand(10, 20),
+        simulated: true,
+        top: [
+          ['South Korea', rand(16, 26)],
+          ['United States', rand(12, 22)],
+          ['Japan', rand(6, 14)],
+          ['North Korea', rand(5, 10)],
+          ['China', rand(3, 8)]
+        ]
+      },
+    ];
+  }
   const thermal = (data.sources.FIRMS?.hotspots || []).map(h => ({
     region: h.region, det: h.totalDetections || 0, night: h.nightDetections || 0,
     hc: h.highConfidence || 0,

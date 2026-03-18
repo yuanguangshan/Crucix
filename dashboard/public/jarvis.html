@@ -391,6 +391,10 @@
         background: var(--accent);
         box-shadow: 0 0 6px rgba(100, 240, 200, 0.4);
       }
+      .ldot.simulated {
+        background: #ffb84c;
+        box-shadow: 0 0 6px rgba(255, 184, 76, 0.4);
+      }
       .ldot.thermal {
         background: var(--danger);
         box-shadow: 0 0 6px rgba(255, 95, 99, 0.4);
@@ -1541,11 +1545,12 @@
         const newsCount = (D.news || []).length;
         const conflictEvents = D.acled?.totalEvents || 0;
         const conflictFatal = D.acled?.totalFatalities || 0;
+        const hasSimulatedAir = D.air.some(a => a.simulated);
         const layers = [
           {
-            name: "Air Activity",
+            name: "Air Activity" + (hasSimulatedAir ? " <span style='color:#ffb84c;font-size:9px'>[SIMULATED]</span>" : ""),
             count: totalAir,
-            dot: "air",
+            dot: hasSimulatedAir ? "simulated" : "air",
             sub: `${D.air.length} theaters`,
           },
           {
@@ -1829,16 +1834,18 @@
         D.air.forEach((a, i) => {
           const c = airCoords[i];
           if (!c) return;
+          const isSimulated = a.simulated || false;
+          const simColor = isSimulated ? "rgba(255,184,76,0.6)" : "rgba(100,240,200,0.8)";
           points.push({
             lat: c.lat,
             lng: c.lon,
             size: 0.25 + a.total / 200,
             alt: 0.015,
-            color: "rgba(100,240,200,0.8)",
+            color: simColor,
             type: "air",
-            label: a.region.replace(" Region", "") + " " + a.total,
+            label: a.region.replace(" Region", "").replace(" (SIMULATED)", "") + " " + a.total,
             popHead: a.region,
-            popMeta: "Air Activity",
+            popMeta: "Air Activity" + (isSimulated ? " <span style='color:#ffb84c'>[SIMULATED]</span>" : ""),
             popText: `${a.total} aircraft tracked<br>No callsign: ${a.noCallsign}<br>High altitude: ${a.highAlt}<br>Top: ${a.top
               .slice(0, 3)
               .map((t) => t[0] + " (" + t[1] + ")")
@@ -1847,9 +1854,9 @@
           labels.push({
             lat: c.lat,
             lng: c.lon + 2,
-            text: a.region.replace(" Region", "") + " " + a.total,
+            text: a.region.replace(" Region", "").replace(" (SIMULATED)", "") + " " + a.total,
             size: 0.35,
-            color: "rgba(106,138,130,0.8)",
+            color: isSimulated ? "rgba(255,184,76,0.6)" : "rgba(106,138,130,0.8)",
           });
         });
 
