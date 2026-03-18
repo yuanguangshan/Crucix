@@ -9,6 +9,7 @@ import { readFileSync, writeFileSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { exec } from 'child_process';
+import { MemoryManager } from '../lib/delta/index.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(__dirname, '..');
@@ -576,6 +577,13 @@ async function cliInject() {
 
   console.log('Fetching RSS news feeds...');
   const V2 = await synthesize(data);
+
+  // Compute delta using MemoryManager
+  const memory = new MemoryManager(join(ROOT, 'runs'));
+  const delta = memory.addRun(V2);
+  V2.delta = delta;
+  console.log(`Delta: ${delta?.summary?.totalChanges || 0} changes, ${delta?.summary?.criticalChanges || 0} critical`);
+
   console.log(`Generated ${V2.ideas.length} leverageable ideas`);
 
   const json = JSON.stringify(V2);

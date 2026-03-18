@@ -687,8 +687,8 @@
         max-width: 380px;
       }
       .lower .lp-delta {
-        flex: 1 1 200px;
-        max-width: 300px;
+        flex: 1.2 1 240px;
+        max-width: 360px;
       }
       .lower .lp-macro {
         flex: 2.5 1 360px;
@@ -978,7 +978,7 @@
       /* NEWS TICKER */
       .ticker-wrap {
         overflow: hidden;
-        max-height: 320px;
+        max-height: 420px;
         position: relative;
         border: 1px solid rgba(100, 240, 200, 0.08);
         background: rgba(0, 0, 0, 0.15);
@@ -1128,7 +1128,7 @@
         animation: pulse-new 2s ease infinite;
       }
       .delta-list {
-        max-height: 160px;
+        max-height: 380px;
         overflow-y: auto;
         scrollbar-width: thin;
         scrollbar-color: rgba(0, 229, 255, 0.2) transparent;
@@ -1144,6 +1144,9 @@
       }
       .delta-row.new {
         background: rgba(77, 208, 225, 0.04);
+      }
+      .delta-row.new:hover {
+        background: rgba(77, 208, 225, 0.08);
       }
       .delta-label {
         flex: 1;
@@ -2779,7 +2782,7 @@
           .join("");
 
         // NEWS TICKER — merges RSS + GDELT + Telegram into flowing cards (moved from right rail)
-        const feed = (D.newsFeed || []).slice(0, 40);
+        const feed = (D.newsFeed || []).slice(0, 80);
         const srcClass = (s) => {
           if (!s) return "other";
           const sl = s.toLowerCase();
@@ -2836,14 +2839,52 @@
         const dirClass =
           { "risk-off": "up", "risk-on": "down", mixed: "" }[ds.direction] ||
           "";
-        const escalated = (delta.signals?.escalated || []).slice(0, 6);
-        const deescalated = (delta.signals?.deescalated || []).slice(0, 4);
-        const newSigs = (delta.signals?.new || []).slice(0, 4);
+        // Dynamic allocation: prioritize new signals, fill remainder with escalated/deescalated
+        const allNew = (delta.signals?.new || []);
+        const allEscalated = (delta.signals?.escalated || []);
+        const allDeescalated = (delta.signals?.deescalated || []);
+
+        // Show up to 8 new signals (they're most important), then fill with others to reach ~12 total
+        const newSigs = allNew.slice(0, 8);
+        const remainingSlots = Math.max(0, 12 - newSigs.length);
+        const escalated = allEscalated.slice(0, Math.ceil(remainingSlots * 0.6));
+        const deescalated = allDeescalated.slice(0, Math.floor(remainingSlots * 0.4));
+
         const deltaRows = [];
+        // Format relative time for posts
+        const formatTime = (dateStr) => {
+          if (!dateStr) return '';
+          const d = new Date(dateStr);
+          const now = new Date();
+          const diffMins = Math.floor((now - d) / 60000);
+          if (diffMins < 1) return 'just now';
+          if (diffMins < 60) return `${diffMins}m ago`;
+          const diffHours = Math.floor(diffMins / 60);
+          if (diffHours < 24) return `${diffHours}h ago`;
+          return `${Math.floor(diffHours / 24)}d ago`;
+        };
         for (const s of newSigs) {
-          deltaRows.push(
-            `<div class="delta-row new"><span class="delta-badge new">NEW</span><span class="delta-label">${s.reason || s.label || s.key}</span></div>`,
-          );
+          // For urgent OSINT posts, show the actual post content with time and channel
+          if (s.reason === 'New urgent OSINT post' && s.text) {
+            const timeStr = formatTime(s.date);
+            const channelStr = s.channel ? `<span style="color:#ffb74d;font-size:8px;margin-left:4px">@${s.channel}</span>` : '';
+            deltaRows.push(
+              `<div class="delta-row new" style="flex-direction:column;align-items:flex-start;gap:2px;padding:6px 0">
+                <div style="display:flex;align-items:center;gap:4px;width:100%">
+                  <span class="delta-badge new">NEW</span>
+                  <span style="color:#4dd0e1;font-size:9px;letter-spacing:0.05em">URGENT OSINT</span>
+                  ${timeStr ? `<span style="color:var(--dim);font-size:8px;margin-left:auto">${timeStr}</span>` : ''}
+                </div>
+                <div style="color:var(--text);font-size:10px;line-height:1.3;margin-left:20px;max-width:100%;overflow:hidden;text-overflow:ellipsis">${s.text}</div>
+                ${channelStr}
+              </div>`
+            );
+          } else {
+            // Other new signals
+            deltaRows.push(
+              `<div class="delta-row new"><span class="delta-badge new">NEW</span><span class="delta-label">${s.reason || s.label || s.key}</span></div>`,
+            );
+          }
         }
         for (const s of escalated) {
           const sev =
@@ -2999,7 +3040,7 @@
     </div>
     <div class="g-panel" style="display:flex;flex-direction:column">
       <div class="sec-head"><h3>OSINT Stream</h3><span class="badge">${D.tg.urgent.length} URGENT</span></div>
-      <div class="ticker-wrap" style="--ticker-duration:${osintDuration}s;max-height:260px">
+      <div class="ticker-wrap" style="--ticker-duration:${osintDuration}s;max-height:520px">
         <div class="ticker-track">${osintCards}${osintCards}</div>
       </div>
     </div>
