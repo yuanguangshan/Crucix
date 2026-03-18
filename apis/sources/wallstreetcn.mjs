@@ -66,7 +66,7 @@ function compactItem(item) {
     date: item.display_time ? new Date(item.display_time * 1000).toISOString() : null,
     important: item.important || false,
     vip: item.vip || false,
-    url: item.source_link || undefined,
+    url: item.uri || item.source_link || undefined,
     source: item.source || '华尔街见闻',
   };
 }
