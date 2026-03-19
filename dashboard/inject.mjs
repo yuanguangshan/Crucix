@@ -103,7 +103,15 @@ function sanitizeExternalUrl(raw) {
 // === RSS Fetching ===
 async function fetchRSS(url, source) {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    // Add User-Agent for sites that require it (The Economist, FT, etc.)
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (compatible; CrucixNewsBot/1.0; +https://crucix.com/bot)'
+    };
+
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      headers
+    });
     const text = await res.text();
 
     // Handle rss2json API responses (JSON format)
