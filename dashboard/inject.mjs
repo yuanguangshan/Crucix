@@ -157,16 +157,18 @@ export async function fetchAllNews() {
     ['http://feeds.bbci.co.uk/news/business/rss.xml', 'BBC Business'],
     ['http://feeds.bbci.co.uk/news/politics/rss.xml', 'BBC Politics'],
     ['https://feeds.bbci.co.uk/news/health/rss.xml', 'BBC Health'],
-    // Reuters
-    ['https://www.reutersagency.com/feed/', 'Reuters Agency'],
-    ['https://www.reuters.com/rssFeed/worldNews', 'Reuters World'],
-    ['https://www.reuters.com/rssFeed/politicsNews', 'Reuters Politics'],
-    ['https://www.reuters.com/rssFeed/businessNews', 'Reuters Business'],
-    ['https://www.reuters.com/rssFeed/technologyNews', 'Reuters Tech'],
-    // AP News (direct)
-    ['https://rsshub.app/apnews/topics/apf-topnews', 'AP News'],
-    ['https://rsshub.app/apnews/topics/apf-worldnews', 'AP World'],
-    ['https://rsshub.app/apnews/topics/apf-politics', 'AP Politics'],
+    // The Economist
+    ['https://www.economist.com/rss', 'The Economist'],
+    ['https://www.economist.com/sections/international/rss', 'Economist Int\'l'],
+    ['https://www.economist.com/sections/finance-and-economics/rss', 'Economist Finance'],
+    ['https://www.economist.com/sections/business/rss', 'Economist Business'],
+    // Financial Times
+    ['https://www.ft.com/rss/world', 'FT World'],
+    ['https://www.ft.com/rss/business', 'FT Business'],
+    ['https://www.ft.com/rss/companies', 'FT Companies'],
+    // Bloomberg
+    ['https://feeds.bloomberg.com/markets/news.rss', 'Bloomberg Markets'],
+    ['https://feeds.bloomberg.com/politics/news.rss', 'Bloomberg Politics'],
     // The Guardian
     ['https://www.theguardian.com/world/rss', 'Guardian World'],
     ['https://www.theguardian.com/politics/rss', 'Guardian Politics'],
@@ -178,11 +180,16 @@ export async function fetchAllNews() {
     ['https://www.france24.com/en/rss', 'France 24'],
     // NHK World
     ['https://www3.nhk.or.jp/rss/news/cat0.xml', 'NHK World'],
+    // Geopolitics/International Relations
+    ['https://foreignpolicy.com/feed', 'Foreign Policy'],
+    ['https://thediplomat.com/feed', 'The Diplomat'],
+    ['https://www.foreignaffairs.com/rss', 'Foreign Affairs'],
+    ['https://www.project-syndicate.org/rss', 'Project Syndicate'],
+    ['https://euobserver.com/rss', 'EUobserver'],
+    ['https://www.euractiv.com/rss', 'Euractiv'],
     // Think tank source
     ['https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.fdd.org%2Ffeed%2F', 'FDD'],
-    // CSIS
     ['https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.csis.org%2Fanalysis%2Frss', 'CSIS'],
-    // RAND
     ['https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.rand.org%2Frss%2Fresearch.html', 'RAND'],
   ];
 
