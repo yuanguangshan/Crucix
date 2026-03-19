@@ -45,6 +45,7 @@ import { briefing as yfinance } from './sources/yfinance.mjs';
 
 // === Tier 6: Chinese Financial News ===
 import { briefing as wallstreetcn } from './sources/wallstreetcn.mjs';
+import { briefing as eastmoney } from './sources/eastmoney.mjs';
 
 export async function runSource(name, fn, ...args) {
   const start = Date.now();
@@ -100,6 +101,7 @@ export async function fullBriefing() {
 
     // Tier 6: Chinese Financial News
     runSource('WallStreetCN', wallstreetcn),
+    runSource('EastMoney', eastmoney),
   ]);
 
   const sources = results.map(r => r.status === 'fulfilled' ? r.value : { status: 'failed', error: r.reason?.message });

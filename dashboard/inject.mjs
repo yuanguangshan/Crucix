@@ -558,6 +558,24 @@ export async function synthesize(data) {
     topTitles: (wscnData.items || []).slice(0, 5).map(i => i.title?.substring(0, 80))
   };
 
+  // East Money (东方财富) Chinese financial news
+  const emData = data.sources.EastMoney || {};
+  const eastmoney = {
+    totalItems: emData.totalItems || 0,
+    markets: (emData.markets || []).length,
+    forex: (emData.forex || []).length,
+    commodities: (emData.commodities || []).length,
+    centralBanks: (emData.centralBanks || []).length,
+    tech: (emData.tech || []).length,
+    geopolitical: (emData.geopolitical || []).length,
+    hot: (emData.hot || []).slice(0, 5).map(i => ({
+      title: i.title?.substring(0, 100),
+      date: i.date,
+      commentnum: i.commentnum
+    })),
+    topTitles: (emData.items || []).slice(0, 5).map(i => i.title?.substring(0, 80))
+  };
+
   const health = Object.entries(data.sources).map(([name, src]) => ({
     n: name, err: Boolean(src.error), stale: Boolean(src.stale)
   }));
@@ -617,18 +635,18 @@ export async function synthesize(data) {
     meta: data.crucix, air, thermal, tSignals, chokepoints, nuke, nukeSignals,
     sdr: { total: sdrNet.totalReceivers || 0, online: sdrNet.online || 0, zones: sdrZones },
     tg: { posts: tgData.totalPosts || 0, urgent: tgUrgent, topPosts: tgTop },
-    who, fred, energy, bls, treasury, gscpi, defense, noaa, acled, gdelt, wallstreetcn, space, health, news,
+    who, fred, energy, bls, treasury, gscpi, defense, noaa, acled, gdelt, wallstreetcn, eastmoney, space, health, news,
     markets, // Live Yahoo Finance market data
     ideas: [], ideasSource: 'disabled',
-    // newsFeed for ticker (merged RSS + GDELT + Telegram + WallStreetCN)
-    newsFeed: buildNewsFeed(news, gdeltData, tgUrgent, tgTop, wscnData),
+    // newsFeed for ticker (merged RSS + GDELT + Telegram + WallStreetCN + EastMoney)
+    newsFeed: buildNewsFeed(news, gdeltData, tgUrgent, tgTop, wscnData, emData),
   };
 
   return V2;
 }
 
 // === Unified News Feed for Ticker ===
-function buildNewsFeed(rssNews, gdeltData, tgUrgent, tgTop, wscnData) {
+function buildNewsFeed(rssNews, gdeltData, tgUrgent, tgTop, wscnData, emData) {
   const feed = [];
 
   // RSS news
@@ -660,6 +678,21 @@ function buildNewsFeed(rssNews, gdeltData, tgUrgent, tgTop, wscnData) {
         timestamp: i.date || new Date().toISOString(),
         region: 'China/Global',
         urgent: i.important || false,
+        url: i.url
+      });
+    }
+  }
+
+  // East Money (东方财富) - Chinese financial news
+  for (const i of (emData?.items || []).slice(0, 15)) {
+    if (i.title) {
+      feed.push({
+        headline: i.title.substring(0, 100),
+        source: i.source || '东方财富',
+        type: 'eastmoney',
+        timestamp: i.date || new Date().toISOString(),
+        region: 'China/Global',
+        urgent: (i.commentnum || 0) > 10,
         url: i.url
       });
     }

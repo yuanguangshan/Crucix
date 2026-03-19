@@ -1093,6 +1093,10 @@
         color: #ff7043;
         border-color: rgba(255, 112, 67, 0.3);
       }
+      .tk-src.em {
+        color: #4dd0e1;
+        border-color: rgba(77, 208, 225, 0.3);
+      }
       .tk-src.other {
         color: #b0bec5;
         border-color: rgba(176, 190, 197, 0.2);
@@ -2804,6 +2808,7 @@
           if (sl.includes("gdelt")) return "gdelt";
           if (sl.includes("telegram")) return "tg";
           if (sl.includes("华尔街") || sl.includes("wallstreet") || sl.includes("wscn")) return "wscn";
+          if (sl.includes("东方财富") || sl.includes("eastmoney")) return "em";
           return "other";
         };
         const tickerCards = feed
