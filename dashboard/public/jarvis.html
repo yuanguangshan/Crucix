@@ -3299,7 +3299,19 @@
         renderLeftRail();
         renderLower();
         renderRight();
-        initMap();
+        try { initMap(); } catch(e) {
+          console.warn("[Crucix] Globe/WebGL unavailable:", e.message);
+          // Show flat map fallback placeholder if globe fails to init
+          const globeViz = document.getElementById("globeViz");
+          if (globeViz) {
+            globeViz.style.display = "none";
+          }
+          const flatMap = document.getElementById("flatMapSvg");
+          if (flatMap) {
+            flatMap.style.display = "block";
+            try { initFlatMap(); } catch(e2) {}
+          }
+        }
         if (!booted) {
           runBoot();
           booted = true;
