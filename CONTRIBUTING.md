@@ -4,7 +4,8 @@ Crucix moves quickly, but review bandwidth is limited. The easiest way to get a 
 
 ## What Contributions Are Most Helpful
 
-- Focused bug fixes with a clear reproduction and validation path
+- Focused bug fixes with a clear 
+- reproduction and validation path
 - Documentation improvements that reduce setup friction
 - Dashboard usability improvements with a small review surface
 - New OSINT sources that add clear signal, degrade gracefully, and fit the existing architecture
