@@ -9,11 +9,11 @@ import { safeFetch } from '../utils/fetch.mjs';
 
 const BASE = 'https://api.gdeltproject.org/api/v2';
 
-// Rate limiting: ensure at least 6 seconds between requests (GDELT limit is 5s)
+// Rate limiting: ensure at least 10 seconds between requests (GDELT limit is 5s, but be conservative)
 let lastRequestEndTime = 0;  // Track when last request ENDED, not started
-const MIN_REQUEST_INTERVAL = 6000;  // 6 seconds minimum (safe buffer above 5s limit)
-const MAX_RETRIES = 3;  // Maximum retries for 429 errors
-const FIRST_REQUEST_WAIT = 7000;  // Wait longer on first request after restart
+const MIN_REQUEST_INTERVAL = 10000;  // 10 seconds minimum (conservative buffer)
+const MAX_RETRIES = 2;  // Maximum retries for 429 errors (reduced to save time)
+const FIRST_REQUEST_WAIT = 15000;  // Wait 15s on first request after restart
 
 async function withRateLimit(fn, retries = MAX_RETRIES) {
   const isFirstRequest = lastRequestEndTime === 0;
@@ -38,12 +38,12 @@ async function withRateLimit(fn, retries = MAX_RETRIES) {
     // Check for 429 error and retry if needed
     if (result?.error?.includes('429')) {
       if (attempt < retries) {
-        const backoffTime = 7000 + Math.random() * 3000; // 7-10 seconds
+        const backoffTime = 12000 + Math.random() * 5000; // 12-17 seconds
         console.log(`[GDELT] Got 429, retrying in ${(backoffTime / 1000).toFixed(1)}s (attempt ${attempt + 1}/${retries})`);
         await delay(backoffTime);
         continue;
       } else {
-        console.error(`[GDELT] Max retries reached for 429 error`);
+        console.error(`[GDELT] Max retries reached for 429 error - API may be rate limiting more aggressively than expected`);
       }
     }
 
@@ -125,7 +125,22 @@ export async function searchEvents(query = '', opts = {}) {
       sort: sortBy,
     });
 
-    return safeFetch(`${BASE}/doc/doc?${params}`);
+    const result = await safeFetch(`${BASE}/doc/doc?${params}`);
+
+    // Debug: log the result structure
+    if (result) {
+      const keys = Object.keys(result);
+      console.log(`[GDELT] Response keys:`, keys);
+      if (result.articles) {
+        console.log(`[GDELT] Articles count: ${result.articles.length}`);
+      } else if (result.error) {
+        console.log(`[GDELT] Error in response:`, result.error);
+      } else {
+        console.log(`[GDELT] Unexpected response format:`, typeof result, JSON.stringify(result).substring(0, 200));
+      }
+    }
+
+    return result;
   });
 }
 
@@ -273,11 +288,11 @@ function categorizeArticle(article) {
 // GDELT rate limit: 1 request per 5 seconds
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// Multiple query keywords for comprehensive coverage (reduced for speed)
+// Multiple query keywords for comprehensive coverage (simplified for testing)
 const QUERY_KEYWORDS = [
-  'war OR conflict OR crisis OR attack',  // Military & Conflicts
-  'economic OR trade OR sanctions',       // Economy & Finance
-  'summit OR meeting OR negotiation',     // Geopolitics & Diplomacy
+  'war',         // Military conflicts
+  'economic',    // Economy & finance
+  'crisis',      // Crisis situations
 ];
 
 // Briefing mode — get top global events summary (sequential due to rate limit)
