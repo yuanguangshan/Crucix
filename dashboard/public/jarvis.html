@@ -2798,7 +2798,7 @@
           .join("");
 
         // NEWS TICKER — merges RSS + GDELT + Telegram into flowing cards (moved from right rail)
-        const feed = (D.newsFeed || []).slice(0, 80);
+        const feed = (D.newsFeed || []).slice(0, 100);
         const srcClass = (s, t) => {
           if (!s) return "other";
           const sl = s.toLowerCase();

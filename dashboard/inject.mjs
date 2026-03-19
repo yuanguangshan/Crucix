@@ -104,16 +104,37 @@ function sanitizeExternalUrl(raw) {
 async function fetchRSS(url, source) {
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    const xml = await res.text();
+    const text = await res.text();
+
+    // Handle rss2json API responses (JSON format)
+    if (url.includes('rss2json.com')) {
+      try {
+        const json = JSON.parse(text);
+        if (json.status === 'ok' && json.items) {
+          return json.items
+            .filter(item => item.title && item.title !== source)
+            .map(item => ({
+              title: item.title?.trim().substring(0, 200),
+              date: item.pubDate || '',
+              source,
+              url: sanitizeExternalUrl(item.link)
+            }));
+        }
+      } catch {
+        // If JSON parsing fails, try XML parsing below
+      }
+    }
+
+    // Handle standard RSS/XML format
     const items = [];
     const itemRegex = /<item>([\s\S]*?)<\/item>/g;
     let match;
-    while ((match = itemRegex.exec(xml)) !== null) {
+    while ((match = itemRegex.exec(text)) !== null) {
       const block = match[1];
       const title = (block.match(/<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/)?.[1] || '').trim();
       const link = sanitizeExternalUrl((block.match(/<link>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/link>/)?.[1] || '').trim());
       const pubDate = block.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || '';
-      if (title && title !== source) items.push({ title, date: pubDate, source, url: link || undefined });
+      if (title && title !== source) items.push({ title: title.substring(0, 200), date: pubDate, source, url: link || undefined });
     }
     return items;
   } catch (e) {
@@ -124,30 +145,85 @@ async function fetchRSS(url, source) {
 
 export async function fetchAllNews() {
   const feeds = [
+    // Main international sources (working)
     ['http://feeds.bbci.co.uk/news/world/rss.xml', 'BBC'],
     ['https://rss.nytimes.com/services/xml/rss/nyt/World.xml', 'NYT'],
-    ['https://feeds.aljazeera.com/xml/rss/all.xml', 'Al Jazeera'],
+    ['https://www.aljazeera.com/xml/rss/all.xml', 'Al Jazeera'],
     ['https://rss.nytimes.com/services/xml/rss/nyt/Americas.xml', 'NYT Americas'],
     ['https://rss.nytimes.com/services/xml/rss/nyt/AsiaPacific.xml', 'NYT Asia'],
     ['https://feeds.bbci.co.uk/news/technology/rss.xml', 'BBC Tech'],
     ['http://feeds.bbci.co.uk/news/science_and_environment/rss.xml', 'BBC Science'],
+    // Additional BBC feeds
+    ['http://feeds.bbci.co.uk/news/business/rss.xml', 'BBC Business'],
+    ['http://feeds.bbci.co.uk/news/politics/rss.xml', 'BBC Politics'],
+    ['https://feeds.bbci.co.uk/news/health/rss.xml', 'BBC Health'],
+    // Reuters
+    ['https://www.reutersagency.com/feed/', 'Reuters Agency'],
+    ['https://www.reuters.com/rssFeed/worldNews', 'Reuters World'],
+    ['https://www.reuters.com/rssFeed/politicsNews', 'Reuters Politics'],
+    ['https://www.reuters.com/rssFeed/businessNews', 'Reuters Business'],
+    ['https://www.reuters.com/rssFeed/technologyNews', 'Reuters Tech'],
+    // AP News (direct)
+    ['https://rsshub.app/apnews/topics/apf-topnews', 'AP News'],
+    ['https://rsshub.app/apnews/topics/apf-worldnews', 'AP World'],
+    ['https://rsshub.app/apnews/topics/apf-politics', 'AP Politics'],
+    // The Guardian
+    ['https://www.theguardian.com/world/rss', 'Guardian World'],
+    ['https://www.theguardian.com/politics/rss', 'Guardian Politics'],
+    ['https://www.theguardian.com/technology/rss', 'Guardian Tech'],
+    ['https://www.theguardian.com/business/rss', 'Guardian Business'],
+    // DW (German)
+    ['https://rss.dw.com/rdf/rss-en-all', 'DW World'],
+    // France 24
+    ['https://www.france24.com/en/rss', 'France 24'],
+    // NHK World
+    ['https://www3.nhk.or.jp/rss/news/cat0.xml', 'NHK World'],
+    // Think tank source
+    ['https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.fdd.org%2Ffeed%2F', 'FDD'],
+    // CSIS
+    ['https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.csis.org%2Fanalysis%2Frss', 'CSIS'],
+    // RAND
+    ['https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.rand.org%2Frss%2Fresearch.html', 'RAND'],
   ];
 
   const results = await Promise.allSettled(
     feeds.map(([url, source]) => fetchRSS(url, source))
   );
 
+  // Log results by source
+  const sourceStats = {};
+  results.forEach((result, i) => {
+    const source = feeds[i][1];
+    if (result.status === 'fulfilled') {
+      const count = result.value.length;
+      sourceStats[source] = count;
+    } else {
+      sourceStats[source] = 0;
+    }
+  });
+  console.error('[RSS] Items by source:', sourceStats);
+
   const allNews = results
     .filter(r => r.status === 'fulfilled')
     .flatMap(r => r.value);
 
-  // De-duplicate and geo-tag
+  console.error(`[RSS] Total items fetched: ${allNews.length}`);
+
+  // De-duplicate (use first 50 chars for better matching)
   const seen = new Set();
-  const geoNews = [];
+  const uniqueNews = [];
   for (const item of allNews) {
-    const key = item.title.substring(0, 40).toLowerCase();
+    const key = item.title.substring(0, 50).toLowerCase().replace(/\s+/g, ' ');
     if (seen.has(key)) continue;
     seen.add(key);
+    uniqueNews.push(item);
+  }
+
+  console.error(`[RSS] After deduplication: ${uniqueNews.length}`);
+
+  // Create geo-tagged subset for map (only items with geo keywords)
+  const geoNews = [];
+  for (const item of uniqueNews) {
     const geo = geoTagText(item.title);
     if (geo) {
       geoNews.push({
@@ -162,8 +238,17 @@ export async function fetchAllNews() {
     }
   }
 
+  console.error(`[RSS] Geo-tagged for map: ${geoNews.length}`);
+
+  // Sort all news (not just geo-tagged) by date
+  uniqueNews.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
   geoNews.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-  return geoNews.slice(0, 50);
+
+  // Return both: all news for ticker, geo-tagged for map
+  return {
+    all: uniqueNews.slice(0, 200), // More items for ticker
+    geo: geoNews.slice(0, 100) // Geo-tagged for map visualization
+  };
 }
 
 // === Leverageable Ideas from Signals ===
@@ -635,11 +720,11 @@ export async function synthesize(data) {
     meta: data.crucix, air, thermal, tSignals, chokepoints, nuke, nukeSignals,
     sdr: { total: sdrNet.totalReceivers || 0, online: sdrNet.online || 0, zones: sdrZones },
     tg: { posts: tgData.totalPosts || 0, urgent: tgUrgent, topPosts: tgTop },
-    who, fred, energy, bls, treasury, gscpi, defense, noaa, acled, gdelt, wallstreetcn, eastmoney, space, health, news,
+    who, fred, energy, bls, treasury, gscpi, defense, noaa, acled, gdelt, wallstreetcn, eastmoney, space, health, news: news.geo, // Geo-tagged for map
     markets, // Live Yahoo Finance market data
     ideas: [], ideasSource: 'disabled',
     // newsFeed for ticker (merged RSS + GDELT + Telegram + WallStreetCN + EastMoney)
-    newsFeed: buildNewsFeed(news, gdeltData, tgUrgent, tgTop, wscnData, emData),
+    newsFeed: buildNewsFeed(news.all, gdeltData, tgUrgent, tgTop, wscnData, emData), // All news for ticker
   };
 
   return V2;
@@ -716,9 +801,9 @@ function buildNewsFeed(rssNews, gdeltData, tgUrgent, tgTop, wscnData, emData) {
     });
   }
 
-  // Sort by timestamp descending, limit to 50
+  // Sort by timestamp descending, limit to 100
   feed.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-  return feed.slice(0, 50);
+  return feed.slice(0, 100);
 }
 
 // === CLI Mode: inject into HTML file ===
