@@ -9,23 +9,46 @@ import { safeFetch } from '../utils/fetch.mjs';
 
 const BASE = 'https://api.gdeltproject.org/api/v2';
 
-// Rate limiting: ensure at least 5.5 seconds between requests (GDELT limit is 5s)
-let lastRequestTime = 0;
-const MIN_REQUEST_INTERVAL = 5500;  // 5.5 seconds minimum (safe buffer above 5s limit)
+// Rate limiting: ensure at least 6 seconds between requests (GDELT limit is 5s)
+let lastRequestEndTime = 0;  // Track when last request ENDED, not started
+const MIN_REQUEST_INTERVAL = 6000;  // 6 seconds minimum (safe buffer above 5s limit)
+const MAX_RETRIES = 3;  // Maximum retries for 429 errors
+const FIRST_REQUEST_WAIT = 7000;  // Wait longer on first request after restart
 
-async function withRateLimit(fn) {
-  const now = Date.now();
-  const timeSinceLastRequest = now - lastRequestTime;
+async function withRateLimit(fn, retries = MAX_RETRIES) {
+  const isFirstRequest = lastRequestEndTime === 0;
 
-  // Always wait at least 5.5 seconds from last request
-  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
-    const waitTime = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
-    console.log(`[GDELT] Rate limiting: waiting ${(waitTime / 1000).toFixed(3)}s`);
-    await delay(waitTime);
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const now = Date.now();
+    const timeSinceLastRequestEnd = now - lastRequestEndTime;
+
+    // For first request after restart, wait longer to be safe
+    const requiredWait = isFirstRequest ? FIRST_REQUEST_WAIT : MIN_REQUEST_INTERVAL;
+
+    if (timeSinceLastRequestEnd < requiredWait) {
+      const waitTime = requiredWait - timeSinceLastRequestEnd;
+      console.log(`[GDELT] Rate limiting: waiting ${(waitTime / 1000).toFixed(3)}s${isFirstRequest ? ' (first request)' : ''}`);
+      await delay(waitTime);
+    }
+
+    // Execute request
+    const result = await fn();
+    lastRequestEndTime = Date.now();
+
+    // Check for 429 error and retry if needed
+    if (result?.error?.includes('429')) {
+      if (attempt < retries) {
+        const backoffTime = 7000 + Math.random() * 3000; // 7-10 seconds
+        console.log(`[GDELT] Got 429, retrying in ${(backoffTime / 1000).toFixed(1)}s (attempt ${attempt + 1}/${retries})`);
+        await delay(backoffTime);
+        continue;
+      } else {
+        console.error(`[GDELT] Max retries reached for 429 error`);
+      }
+    }
+
+    return result;
   }
-
-  lastRequestTime = Date.now();
-  return fn();
 }
 
 // Cache (15 minutes TTL - matches dashboard refresh)
