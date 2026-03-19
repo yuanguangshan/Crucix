@@ -9,21 +9,18 @@ import { safeFetch } from '../utils/fetch.mjs';
 
 const BASE = 'https://api.gdeltproject.org/api/v2';
 
-// Rate limiting: random interval between requests (6-10 seconds) to avoid strict rate limiting
+// Rate limiting: ensure at least 5.5 seconds between requests (GDELT limit is 5s)
 let lastRequestTime = 0;
-const MIN_REQUEST_INTERVAL = 6000;  // 6 seconds minimum
-const MAX_REQUEST_INTERVAL = 10000; // 10 seconds maximum
+const MIN_REQUEST_INTERVAL = 5500;  // 5.5 seconds minimum (safe buffer above 5s limit)
 
 async function withRateLimit(fn) {
   const now = Date.now();
   const timeSinceLastRequest = now - lastRequestTime;
 
-  // Calculate random wait time between 6-10 seconds
-  const randomWait = MIN_REQUEST_INTERVAL + Math.random() * (MAX_REQUEST_INTERVAL - MIN_REQUEST_INTERVAL);
-
-  if (timeSinceLastRequest < randomWait) {
-    const waitTime = Math.round(randomWait - timeSinceLastRequest);
-    console.log(`[GDELT] Rate limiting: waiting ${waitTime / 1000}s`);
+  // Always wait at least 5.5 seconds from last request
+  if (timeSinceLastRequest < MIN_REQUEST_INTERVAL) {
+    const waitTime = MIN_REQUEST_INTERVAL - timeSinceLastRequest;
+    console.log(`[GDELT] Rate limiting: waiting ${(waitTime / 1000).toFixed(3)}s`);
     await delay(waitTime);
   }
 
@@ -253,17 +250,11 @@ function categorizeArticle(article) {
 // GDELT rate limit: 1 request per 5 seconds
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// Multiple query keywords for comprehensive coverage
+// Multiple query keywords for comprehensive coverage (reduced for speed)
 const QUERY_KEYWORDS = [
-  'crisis',      // Conflicts, disasters, emergencies
-  'war',         // Military conflicts, wars
-  'economic',    // Economy, markets, finance
-  'summit',      // Diplomatic meetings, negotiations
-  'trade',       // Trade, tariffs, sanctions
-  'attack',      // Military strikes, conflicts
-  'sanctions',   // Economic sanctions
-  'emergency',   // Emergency situations
-  'inflation',   // Inflation, prices
+  'war OR conflict OR crisis OR attack',  // Military & Conflicts
+  'economic OR trade OR sanctions',       // Economy & Finance
+  'summit OR meeting OR negotiation',     // Geopolitics & Diplomacy
 ];
 
 // Briefing mode — get top global events summary (sequential due to rate limit)
@@ -287,7 +278,7 @@ export async function briefing() {
     const keyword = QUERY_KEYWORDS[i];
     console.log(`[GDELT] [${i + 1}/${QUERY_KEYWORDS.length}] Querying: "${keyword}"`);
 
-    const result = await searchEvents(keyword, { maxRecords: 50, timespan: '24h' });
+    const result = await searchEvents(keyword, { maxRecords: 150, timespan: '24h' });
 
     if (result?.error) {
       console.error(`[GDELT] Error for "${keyword}":`, result.error);
