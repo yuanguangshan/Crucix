@@ -481,8 +481,9 @@
 
       /* CENTER: MAP */
       .map-container {
-        flex: 1;
-        min-height: 560px;
+        flex: none;
+        height: 560px;
+        max-height: 560px;
         border: 1px solid var(--border);
         background: radial-gradient(
           ellipse at center,
@@ -2985,6 +2986,10 @@
         <div class="spark">${sparkHtml}</div>
       </div>
     </div>
+    <div class="g-panel" style="display:flex;flex-direction:column;min-height:750px">
+      <div class="sec-head"><h3>Hot Map</h3></div>
+      <iframe src="https://v.want.biz/" style="flex:1;border:none;background:#1a1a2e;border-radius:6px;filter:invert(0.92) hue-rotate(180deg);" allowfullscreen></iframe>
+    </div>
     <div class="g-panel lp-ideas">
       <div class="sec-head"><h3>Leverageable Ideas</h3>${D.ideasSource === "llm" ? '<span class="ideas-src llm">AI ENHANCED</span>' : D.ideasSource === "disabled" ? '<span class="ideas-src static">LLM OFF</span>' : '<span class="ideas-src static">PENDING</span>'}</div>
       ${ideasHtml}
@@ -3066,6 +3071,10 @@
     <div class="g-panel">
       <div class="sec-head"><h3>Signal Core</h3><span class="badge">HOT METRICS</span></div>
       ${signalMetrics.map((s) => `<div class="sm"><span class="sml">${s.l}</span><div class="smb"><span style="width:${s.p}%"></span></div><span class="smv">${s.v}</span></div>`).join("")}
+    </div>
+    <div class="g-panel" style="display:flex;flex-direction:column;min-height:800px">
+      <div class="sec-head"><h3>Wealth Future</h3></div>
+      <iframe src="https://wealth.want.biz/pages/future.html?dark=1" style="flex:1;border:none;background:var(--panel);border-radius:6px;" allowfullscreen></iframe>
     </div>`;
       }
 
