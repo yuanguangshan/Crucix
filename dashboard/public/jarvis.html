@@ -2799,7 +2799,7 @@
 
         // NEWS TICKER — merges RSS + GDELT + Telegram into flowing cards (moved from right rail)
         const feed = (D.newsFeed || []).slice(0, 80);
-        const srcClass = (s) => {
+        const srcClass = (s, t) => {
           if (!s) return "other";
           const sl = s.toLowerCase();
           if (sl.includes("bbc")) return "bbc";
@@ -2808,12 +2808,13 @@
           if (sl.includes("gdelt")) return "gdelt";
           if (sl.includes("telegram")) return "tg";
           if (sl.includes("华尔街") || sl.includes("wallstreet") || sl.includes("wscn")) return "wscn";
-          if (sl.includes("东方财富") || sl.includes("eastmoney")) return "em";
+          // EastMoney news items have type='eastmoney'
+          if (t === "eastmoney" || sl.includes("东方财富") || sl.includes("财联社") || sl.includes("第一财经") || sl.includes("央视新闻") || sl.includes("证券时报") || sl.includes("界面新闻") || sl.includes("澎湃新闻") || sl.includes("新华社") || sl.includes("中新经纬") || sl.includes("人民财讯") || sl.includes("科创板日报") || sl.includes("21世纪经济报道") || sl.includes("每日经济新闻") || sl.includes("蓝鲸新闻") || sl.includes("上海证券报") || sl.includes("中国证券网") || sl.includes("中国新闻网") || sl.includes("央视") || sl.includes("cctv")) return "em";
           return "other";
         };
         const tickerCards = feed
           .map((n) => {
-            const sc = srcClass(n.source);
+            const sc = srcClass(n.source, n.type);
             const age = n.timestamp ? getAge(n.timestamp) : "";
             const urlAttr = n.url
               ? ` data-url="${String(n.url).replace(/&/g, "&amp;").replace(/"/g, "&quot;")}"`
