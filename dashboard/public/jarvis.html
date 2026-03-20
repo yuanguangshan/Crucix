@@ -528,12 +528,85 @@
         background: linear-gradient(180deg, rgba(4, 12, 20, 0.95), rgba(4, 12, 20, 0.85));
         border-bottom: 1px solid rgba(100, 240, 200, 0.2);
         z-index: 10;
-        overflow: hidden;
+        display: flex;
+        align-items: center;
       }
       .ticker-wrapper {
+        flex: 1;
         height: 100%;
         overflow: hidden;
         position: relative;
+      }
+      .ticker-filter {
+        display: flex;
+        align-items: center;
+        height: 100%;
+        border-left: 1px solid rgba(100, 240, 200, 0.2);
+        background: rgba(0, 0, 0, 0.3);
+      }
+      .filter-title {
+        padding: 0 10px;
+        font-size: 10px;
+        color: rgba(100, 240, 200, 0.6);
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        writing-mode: vertical-rl;
+        text-orientation: mixed;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        border-right: 1px solid rgba(100, 240, 200, 0.1);
+      }
+      .filter-options {
+        display: none;
+        position: absolute;
+        top: 48px;
+        right: 0;
+        background: rgba(4, 12, 20, 0.98);
+        border: 1px solid rgba(100, 240, 200, 0.3);
+        border-top: none;
+        min-width: 150px;
+        max-height: 400px;
+        overflow-y: auto;
+        z-index: 20;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      }
+      .ticker-filter:hover .filter-options {
+        display: block;
+      }
+      .filter-option {
+        padding: 10px 15px;
+        font-size: 12px;
+        color: rgba(180, 200, 210, 0.8);
+        cursor: pointer;
+        border-bottom: 1px solid rgba(100, 240, 200, 0.1);
+        transition: all 0.2s;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .filter-option:hover {
+        background: rgba(100, 240, 200, 0.1);
+        color: rgba(100, 240, 200, 1);
+      }
+      .filter-option.active {
+        background: rgba(100, 240, 200, 0.2);
+        color: rgba(100, 240, 200, 1);
+        font-weight: 600;
+      }
+      .filter-option .count {
+        font-size: 10px;
+        color: rgba(100, 240, 200, 0.5);
+        background: rgba(100, 240, 200, 0.1);
+        padding: 2px 6px;
+        border-radius: 3px;
+      }
+      .filter-option:hover .count {
+        background: rgba(100, 240, 200, 0.2);
+      }
+      .filter-option.active .count {
+        background: rgba(100, 240, 200, 0.3);
+        color: rgba(100, 240, 200, 1);
       }
       .ticker-content {
         position: relative;
@@ -547,15 +620,24 @@
         height: 100%;
         display: flex;
         align-items: center;
-        justify-content: center;
-        padding: 0 30px;
-        color: rgba(180, 200, 210, 0.9);
+        justify-content: flex-start;
+        padding: 0 20px 0 50px;
+        color: rgba(255, 255, 255, 0.95);
         font-size: 16px;
         cursor: pointer;
-        transition: background 0.2s;
         text-decoration: none;
         opacity: 0;
         transform: translateY(20px);
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+      }
+      .ticker-item::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 5px;
+        background: linear-gradient(180deg, rgba(100, 240, 200, 0.9), rgba(100, 240, 200, 0.4));
       }
       .ticker-item.active {
         opacity: 1;
@@ -563,42 +645,68 @@
         transition: opacity 0.4s ease, transform 0.4s ease;
       }
       .ticker-item:hover {
-        background: rgba(100, 240, 200, 0.1);
+        filter: brightness(1.1);
       }
       .ticker-item.ticker-no-link {
         cursor: default;
         pointer-events: none;
       }
       .ticker-item.ticker-no-link:hover {
-        background: transparent;
+        filter: none;
+      }
+      .ticker-item.ticker-urgent {
+        background: linear-gradient(90deg, rgba(255, 95, 99, 0.25), rgba(255, 95, 99, 0.05), transparent);
+      }
+      .ticker-item.ticker-urgent::before {
+        background: linear-gradient(180deg, rgba(255, 95, 99, 0.9), rgba(255, 95, 99, 0.4));
+      }
+      .ticker-item.ticker-earthquake {
+        background: linear-gradient(90deg, rgba(255, 184, 76, 0.2), rgba(255, 184, 76, 0.05), transparent);
+      }
+      .ticker-item.ticker-earthquake::before {
+        background: linear-gradient(180deg, rgba(255, 184, 76, 0.9), rgba(255, 184, 76, 0.4));
+      }
+      .ticker-item:not(.ticker-urgent):not(.ticker-earthquake) {
+        background: linear-gradient(90deg, rgba(100, 240, 200, 0.15), rgba(100, 240, 200, 0.03), transparent);
       }
       .ticker-item .ticker-source {
-        color: rgba(100, 240, 200, 0.8);
-        font-weight: 600;
-        margin-right: 10px;
+        color: rgba(100, 240, 200, 1);
+        font-weight: 700;
+        margin-right: 12px;
         font-size: 13px;
         text-transform: uppercase;
-        letter-spacing: 0.5px;
+        letter-spacing: 1px;
         flex-shrink: 0;
+        text-shadow: 0 0 10px rgba(100, 240, 200, 0.5);
+      }
+      .ticker-item.ticker-urgent .ticker-source {
+        color: rgba(255, 95, 99, 1);
+        text-shadow: 0 0 10px rgba(255, 95, 99, 0.5);
+      }
+      .ticker-item.ticker-earthquake .ticker-source {
+        color: rgba(255, 184, 76, 1);
+        text-shadow: 0 0 10px rgba(255, 184, 76, 0.5);
       }
       .ticker-item .ticker-text {
         flex: 1;
-        text-align: center;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
+        font-weight: 500;
+        letter-spacing: 0.3px;
       }
       .ticker-item .ticker-time {
-        color: rgba(140, 160, 170, 0.7);
+        color: rgba(255, 255, 255, 0.6);
         font-size: 13px;
-        margin-left: 8px;
-        font-weight: normal;
+        margin-left: 12px;
+        font-weight: 500;
       }
       .ticker-item .ticker-new {
         color: #ff5f63;
         font-size: 13px;
-        font-weight: 600;
-        margin-right: 10px;
+        font-weight: 700;
+        margin-right: 12px;
+        text-shadow: 0 0 8px rgba(255, 95, 99, 0.6);
         animation: pulse-new 1.5s ease-in-out infinite;
       }
       @keyframes pulse-new {
@@ -1525,6 +1633,10 @@
               <div class="ticker-wrapper" id="tickerWrapper">
                 <div class="ticker-content" id="tickerContent"></div>
               </div>
+              <div class="ticker-filter" id="tickerFilter">
+                <div class="filter-title">来源</div>
+                <div class="filter-options" id="filterOptions"></div>
+              </div>
             </div>
             <div id="globeViz"></div>
             <svg
@@ -2004,16 +2116,76 @@
           )
           .join("");
 
-        // Populate map news ticker (vertical slide)
+        // Populate map news ticker (vertical slide with source filtering)
         const tickerContent = document.getElementById("tickerContent");
-        if (tickerContent && D.newsFeed) {
-          // Show latest 30 news items (no time limit)
-          const tickerItems = D.newsFeed.slice(0, 30);
+        const filterOptions = document.getElementById("filterOptions");
 
-          if (tickerItems.length > 0) {
-            // Create all ticker items
+        if (tickerContent && filterOptions && D.newsFeed) {
+          // Store all news items globally for filtering
+          const allNewsItems = D.newsFeed.slice(0, 100);
+          let currentFilter = "全部";
+          let filteredItems = [...allNewsItems];
+          let currentIndex = 0;
+          let tickerInterval = null;
+          let itemElements = [];
+
+          // Extract unique sources
+          const sourceCounts = {};
+          allNewsItems.forEach((item) => {
+            const source = item.source || "未知";
+            sourceCounts[source] = (sourceCounts[source] || 0) + 1;
+          });
+
+          // Create filter options
+          const sources = Object.keys(sourceCounts).sort();
+          const filterHtml = [
+            '<div class="filter-option active" data-source="全部">' +
+              '<span>全部</span>' +
+              '<span class="count">' + allNewsItems.length + '</span>' +
+            '</div>',
+            ...sources.map((source) => {
+              return (
+                '<div class="filter-option" data-source="' +
+                source +
+                '">' +
+                '<span>' +
+                source +
+                '</span>' +
+                '<span class="count">' +
+                sourceCounts[source] +
+                '</span>' +
+                '</div>'
+              );
+            }),
+          ].join("");
+          filterOptions.innerHTML = filterHtml;
+
+          // Filter click handler
+          filterOptions.querySelectorAll(".filter-option").forEach((option) => {
+            option.addEventListener("click", function () {
+              // Update active state
+              filterOptions.querySelectorAll(".filter-option").forEach((o) => o.classList.remove("active"));
+              this.classList.add("active");
+
+              // Get selected source
+              currentFilter = this.getAttribute("data-source");
+
+              // Filter items
+              if (currentFilter === "全部") {
+                filteredItems = [...allNewsItems];
+              } else {
+                filteredItems = allNewsItems.filter((item) => (item.source || "未知") === currentFilter);
+              }
+
+              // Re-render ticker
+              renderTicker();
+            });
+          });
+
+          // Render ticker items
+          function renderTicker() {
             const now = Date.now();
-            const itemsHtml = tickerItems.map((item, index) => {
+            const itemsHtml = filteredItems.map((item, index) => {
               let itemClass = "ticker-item";
               let sourceLabel = item.source || "NEWS";
 
@@ -2063,40 +2235,50 @@
 
             tickerContent.innerHTML = itemsHtml;
 
-            // Vertical slide animation
-            let currentIndex = 0;
-            const itemElements = tickerContent.querySelectorAll(".ticker-item");
+            // Update item elements
+            itemElements = tickerContent.querySelectorAll(".ticker-item");
 
-            function showItem(index) {
-              itemElements.forEach((el, i) => {
-                if (i === index) {
-                  el.classList.add("active");
-                } else {
-                  el.classList.remove("active");
-                }
-              });
-            }
-
-            // Show first item immediately
+            // Reset to first item
+            currentIndex = 0;
             showItem(0);
 
-            // Set up auto-rotation (10 seconds per item)
-            let tickerInterval = setInterval(() => {
-              currentIndex = (currentIndex + 1) % itemElements.length;
-              showItem(currentIndex);
-            }, 10000);
-
-            // Pause on hover
-            tickerContent.addEventListener("mouseenter", () => {
-              clearInterval(tickerInterval);
-            });
-
-            tickerContent.addEventListener("mouseleave", () => {
+            // Restart interval
+            if (tickerInterval) clearInterval(tickerInterval);
+            if (itemElements.length > 1) {
               tickerInterval = setInterval(() => {
                 currentIndex = (currentIndex + 1) % itemElements.length;
                 showItem(currentIndex);
               }, 10000);
+            }
+          }
+
+          function showItem(index) {
+            itemElements.forEach((el, i) => {
+              if (i === index) {
+                el.classList.add("active");
+              } else {
+                el.classList.remove("active");
+              }
             });
+          }
+
+          // Pause on hover
+          tickerContent.addEventListener("mouseenter", () => {
+            if (tickerInterval) clearInterval(tickerInterval);
+          });
+
+          tickerContent.addEventListener("mouseleave", () => {
+            if (itemElements.length > 1) {
+              tickerInterval = setInterval(() => {
+                currentIndex = (currentIndex + 1) % itemElements.length;
+                showItem(currentIndex);
+              }, 10000);
+            }
+          });
+
+          // Initial render
+          if (allNewsItems.length > 0) {
+            renderTicker();
           } else {
             tickerContent.innerHTML =
               '<div class="ticker-item active"><span class="ticker-source">INFO</span><span class="ticker-text">暂无新闻数据</span></div>';
