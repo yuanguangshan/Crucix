@@ -151,6 +151,78 @@ async function fetchRSS(url, source) {
   }
 }
 
+// === Earthquake Data Fetching (USGS GeoJSON) ===
+async function fetchEarthquakes() {
+  try {
+    const url = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.geojson';
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(10000),
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; CrucixNewsBot/1.0; +https://crucix.com/bot)'
+      }
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+
+    // Convert GeoJSON to map display format
+    const earthquakes = (data.features || []).map(feature => {
+      const props = feature.properties || {};
+      const coords = feature.geometry?.coordinates || [0, 0, 0];
+      const [lon, lat, depth] = coords;
+
+      // Create location description
+      const place = props.place || 'Unknown Location';
+
+      // Format title with magnitude
+      const mag = props.mag || 0;
+      const magType = props.magType || 'M';
+      const title = `M${mag.toFixed(1)} ${place}`;
+
+      // Determine urgency based on magnitude
+      const urgent = mag >= 6.0;
+      const type = mag >= 6.0 ? 'critical' : mag >= 5.5 ? 'warning' : 'info';
+
+      return {
+        title: title.substring(0, 100),
+        source: 'USGS Earthquakes',
+        date: new Date(props.time || Date.now()).toISOString(),
+        url: props.url || undefined,
+        lat,
+        lon,
+        region: place,
+        // Extra earthquake-specific data
+        type,
+        urgent,
+        mag: mag.toFixed(1),
+        depth: depth ? depth.toFixed(1) + 'km' : 'N/A',
+        tsunami: props.tsunami === 1,
+        felt: props.felt || null,
+        cdi: props.cdi || null,
+        mmi: props.mmi || null,
+        alert: props.alert || null,
+        sig: props.sig || 0
+      };
+    });
+
+    // Sort by significance/time (most significant/recent first)
+    earthquakes.sort((a, b) => {
+      if (b.urgent !== a.urgent) return b.urgent ? 1 : -1;
+      return b.sig - a.sig;
+    });
+
+    console.error(`[Earthquakes] Fetched ${earthquakes.length} events (M4.5+)`);
+    return earthquakes;
+
+  } catch (e) {
+    console.log(`[Earthquakes] Fetch failed:`, e.message);
+    return [];
+  }
+}
+
 export async function fetchAllNews() {
   const feeds = [
     // Main international sources (working)
@@ -264,10 +336,42 @@ export async function fetchAllNews() {
   uniqueNews.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
   geoNews.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 
-  // Return both: all news for ticker, geo-tagged for map
+  // Fetch earthquake data (separate call, not dependent on RSS)
+  const earthquakes = await fetchEarthquakes();
+
+  // Add earthquakes to both feed (for ticker) and map (for visualization)
+  // Earthquakes have precise coordinates, no need for random offset
+  const earthquakesForMap = earthquakes.map(eq => ({
+    title: eq.title,
+    source: eq.source,
+    date: eq.date,
+    url: eq.url,
+    lat: eq.lat,
+    lon: eq.lon,
+    region: eq.region,
+    // Earthquake-specific display properties
+    type: eq.type,
+    urgent: eq.urgent,
+    mag: eq.mag,
+    depth: eq.depth,
+    tsunami: eq.tsunami
+  }));
+
+  // Combine geo-tagged news with earthquakes for map display
+  const allGeoItems = [...geoNews, ...earthquakesForMap];
+  allGeoItems.sort((a, b) => {
+    // Urgent items first, then by date
+    if (b.urgent !== a.urgent) return b.urgent ? 1 : -1;
+    return new Date(b.date || 0) - new Date(a.date || 0);
+  });
+
+  console.error(`[News] Total map items (news + earthquakes): ${allGeoItems.length}`);
+
+  // Return: all news for ticker, combined geo-tagged items for map
   return {
     all: uniqueNews.slice(0, 200), // More items for ticker
-    geo: geoNews.slice(0, 100) // Geo-tagged for map visualization
+    geo: allGeoItems.slice(0, 150), // Combined news + earthquakes for map
+    earthquakes: earthquakes.slice(0, 50) // Separate earthquakes array for detailed view
   };
 }
 
@@ -743,15 +847,17 @@ export async function synthesize(data) {
     who, fred, energy, bls, treasury, gscpi, defense, noaa, acled, gdelt, wallstreetcn, eastmoney, space, health, news: news.geo, // Geo-tagged for map
     markets, // Live Yahoo Finance market data
     ideas: [], ideasSource: 'disabled',
-    // newsFeed for ticker (merged RSS + GDELT + Telegram + WallStreetCN + EastMoney)
-    newsFeed: buildNewsFeed(news.all, gdeltData, tgUrgent, tgTop, wscnData, emData), // All news for ticker
+    // newsFeed for ticker (merged RSS + GDELT + Telegram + WallStreetCN + EastMoney + Earthquakes)
+    newsFeed: buildNewsFeed(news.all, gdeltData, tgUrgent, tgTop, wscnData, emData, news.earthquakes || []), // All news for ticker
+    // Separate earthquakes array for detailed earthquake view
+    earthquakes: news.earthquakes || [],
   };
 
   return V2;
 }
 
 // === Unified News Feed for Ticker ===
-function buildNewsFeed(rssNews, gdeltData, tgUrgent, tgTop, wscnData, emData) {
+function buildNewsFeed(rssNews, gdeltData, tgUrgent, tgTop, wscnData, emData, earthquakes = []) {
   const feed = [];
 
   // RSS news
@@ -821,9 +927,29 @@ function buildNewsFeed(rssNews, gdeltData, tgUrgent, tgTop, wscnData, emData) {
     });
   }
 
-  // Sort by timestamp descending, limit to 100
-  feed.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-  return feed.slice(0, 100);
+  // Earthquakes (USGS) - add significant earthquakes to feed
+  for (const eq of earthquakes.slice(0, 15)) {
+    feed.push({
+      headline: eq.title,
+      source: eq.source,
+      type: 'earthquake',
+      timestamp: eq.date,
+      region: eq.region || 'Global',
+      urgent: eq.urgent || false,
+      url: eq.url,
+      // Extra earthquake data for display
+      mag: eq.mag,
+      depth: eq.depth,
+      tsunami: eq.tsunami
+    });
+  }
+
+  // Sort by timestamp descending, prioritize urgent items
+  feed.sort((a, b) => {
+    if (b.urgent !== a.urgent) return b.urgent ? 1 : -1;
+    return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+  });
+  return feed.slice(0, 120); // Increased limit to accommodate earthquakes
 }
 
 // === CLI Mode: inject into HTML file ===
@@ -848,7 +974,8 @@ async function cliInject() {
 
   const htmlPath = join(ROOT, 'dashboard/public/jarvis.html');
   let html = readFileSync(htmlPath, 'utf8');
-  html = html.replace(/^(let|const) D = .*;\s*$/m, 'let D = ' + json + ';');
+  // Replace let D = null; with actual data
+  html = html.replace('let D = null;', 'let D = ' + json + ';');
   writeFileSync(htmlPath, html);
   console.log('Data injected into jarvis.html!');
 
