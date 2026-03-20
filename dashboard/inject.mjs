@@ -170,6 +170,7 @@ export async function fetchAllNews() {
     ['https://www.economist.com/sections/international/rss', 'Economist Int\'l'],
     ['https://www.economist.com/sections/finance-and-economics/rss', 'Economist Finance'],
     ['https://www.economist.com/sections/business/rss', 'Economist Business'],
+    ['https://www.economist.com/the-world-this-week/rss.xml', 'The World This Week'],
     // Financial Times
     ['https://www.ft.com/rss/world', 'FT World'],
     ['https://www.ft.com/rss/business', 'FT Business'],
@@ -182,6 +183,10 @@ export async function fetchAllNews() {
     ['https://www.theguardian.com/politics/rss', 'Guardian Politics'],
     ['https://www.theguardian.com/technology/rss', 'Guardian Tech'],
     ['https://www.theguardian.com/business/rss', 'Guardian Business'],
+    ['https://www.theguardian.com/us/technology/rss', 'Guardian US Tech'],
+    // US News sources
+    ['https://abcnews.com/abcnews/usheadlines', 'ABC News'],
+    ['https://feeds.npr.org/1004/rss.xml', 'NPR'],
     // DW (German)
     ['https://rss.dw.com/rdf/rss-en-all', 'DW World'],
     // France 24
