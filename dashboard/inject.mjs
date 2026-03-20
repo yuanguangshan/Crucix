@@ -972,6 +972,10 @@ async function cliInject() {
   console.log('Size:', json.length, 'bytes | Air:', V2.air.length, '| Thermal:', V2.thermal.length,
     '| News:', V2.news.length, '| Ideas:', V2.ideas.length, '| Sources:', V2.health.length);
 
+  // Log earthquake and RSS statistics
+  console.log('[RSS] Total feeds: 32 (BBC, NYT, Al Jazeera, Guardian, Bloomberg, FT, Economist, etc.)');
+  console.log('[Earthquakes] USGS M4.5+:', V2.earthquakes?.length || 0, 'events (past week)');
+
   const htmlPath = join(ROOT, 'dashboard/public/jarvis.html');
   let html = readFileSync(htmlPath, 'utf8');
   // Replace let D = null; with actual data
