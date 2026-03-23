@@ -4,7 +4,7 @@
 
 import { safeFetch } from '../utils/fetch.mjs';
 
-const CELESTRAK_BASE = 'https://celestrak.org';
+const CELESTRAK_BASE = 'https://star.want.biz';
 
 // Satellite categories for monitoring
 const SAT_CATEGORIES = {

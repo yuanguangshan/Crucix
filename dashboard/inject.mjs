@@ -103,17 +103,46 @@ function sanitizeExternalUrl(raw) {
 // === RSS Fetching ===
 async function fetchRSS(url, source) {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
-    const xml = await res.text();
+    // Add User-Agent for sites that require it (The Economist, FT, etc.)
+    const headers = {
+      'User-Agent': 'Mozilla/5.0 (compatible; CrucixNewsBot/1.0; +https://crucix.com/bot)'
+    };
+
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(8000),
+      headers
+    });
+    const text = await res.text();
+
+    // Handle rss2json API responses (JSON format)
+    if (url.includes('rss2json.com')) {
+      try {
+        const json = JSON.parse(text);
+        if (json.status === 'ok' && json.items) {
+          return json.items
+            .filter(item => item.title && item.title !== source)
+            .map(item => ({
+              title: item.title?.trim().substring(0, 200),
+              date: item.pubDate || '',
+              source,
+              url: sanitizeExternalUrl(item.link)
+            }));
+        }
+      } catch {
+        // If JSON parsing fails, try XML parsing below
+      }
+    }
+
+    // Handle standard RSS/XML format
     const items = [];
     const itemRegex = /<item>([\s\S]*?)<\/item>/g;
     let match;
-    while ((match = itemRegex.exec(xml)) !== null) {
+    while ((match = itemRegex.exec(text)) !== null) {
       const block = match[1];
       const title = (block.match(/<title>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/title>/)?.[1] || '').trim();
       const link = sanitizeExternalUrl((block.match(/<link>(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?<\/link>/)?.[1] || '').trim());
       const pubDate = block.match(/<pubDate>(.*?)<\/pubDate>/)?.[1] || '';
-      if (title && title !== source) items.push({ title, date: pubDate, source, url: link || undefined });
+      if (title && title !== source) items.push({ title: title.substring(0, 200), date: pubDate, source, url: link || undefined });
     }
     return items;
   } catch (e) {
@@ -122,32 +151,171 @@ async function fetchRSS(url, source) {
   }
 }
 
+// === Earthquake Data Fetching (USGS GeoJSON) ===
+async function fetchEarthquakes() {
+  try {
+    const url = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/4.5_week.geojson';
+    const res = await fetch(url, {
+      signal: AbortSignal.timeout(10000),
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (compatible; CrucixNewsBot/1.0; +https://crucix.com/bot)'
+      }
+    });
+
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+
+    // Convert GeoJSON to map display format
+    const earthquakes = (data.features || []).map(feature => {
+      const props = feature.properties || {};
+      const coords = feature.geometry?.coordinates || [0, 0, 0];
+      const [lon, lat, depth] = coords;
+
+      // Create location description
+      const place = props.place || 'Unknown Location';
+
+      // Format title with magnitude
+      const mag = props.mag || 0;
+      const magType = props.magType || 'M';
+      const title = `M${mag.toFixed(1)} ${place}`;
+
+      // Determine urgency based on magnitude
+      const urgent = mag >= 6.0;
+      const type = mag >= 6.0 ? 'critical' : mag >= 5.5 ? 'warning' : 'info';
+
+      return {
+        title: title.substring(0, 100),
+        source: 'USGS Earthquakes',
+        date: new Date(props.time || Date.now()).toISOString(),
+        url: props.url || undefined,
+        lat,
+        lon,
+        region: place,
+        // Extra earthquake-specific data
+        type,
+        urgent,
+        mag: mag.toFixed(1),
+        depth: depth ? depth.toFixed(1) + 'km' : 'N/A',
+        tsunami: props.tsunami === 1,
+        felt: props.felt || null,
+        cdi: props.cdi || null,
+        mmi: props.mmi || null,
+        alert: props.alert || null,
+        sig: props.sig || 0
+      };
+    });
+
+    // Sort by significance/time (most significant/recent first)
+    earthquakes.sort((a, b) => {
+      if (b.urgent !== a.urgent) return b.urgent ? 1 : -1;
+      return b.sig - a.sig;
+    });
+
+    console.error(`[Earthquakes] Fetched ${earthquakes.length} events (M4.5+)`);
+    return earthquakes;
+
+  } catch (e) {
+    console.log(`[Earthquakes] Fetch failed:`, e.message);
+    return [];
+  }
+}
+
 export async function fetchAllNews() {
   const feeds = [
+    // Main international sources (working)
     ['http://feeds.bbci.co.uk/news/world/rss.xml', 'BBC'],
     ['https://rss.nytimes.com/services/xml/rss/nyt/World.xml', 'NYT'],
-    ['https://feeds.aljazeera.com/xml/rss/all.xml', 'Al Jazeera'],
+    ['https://www.aljazeera.com/xml/rss/all.xml', 'Al Jazeera'],
     ['https://rss.nytimes.com/services/xml/rss/nyt/Americas.xml', 'NYT Americas'],
     ['https://rss.nytimes.com/services/xml/rss/nyt/AsiaPacific.xml', 'NYT Asia'],
     ['https://feeds.bbci.co.uk/news/technology/rss.xml', 'BBC Tech'],
     ['http://feeds.bbci.co.uk/news/science_and_environment/rss.xml', 'BBC Science'],
+    // Additional BBC feeds
+    ['http://feeds.bbci.co.uk/news/business/rss.xml', 'BBC Business'],
+    ['http://feeds.bbci.co.uk/news/politics/rss.xml', 'BBC Politics'],
+    ['https://feeds.bbci.co.uk/news/health/rss.xml', 'BBC Health'],
+    // The Economist
+    ['https://www.economist.com/rss', 'The Economist'],
+    ['https://www.economist.com/sections/international/rss', 'Economist Int\'l'],
+    ['https://www.economist.com/sections/finance-and-economics/rss', 'Economist Finance'],
+    ['https://www.economist.com/sections/business/rss', 'Economist Business'],
+    ['https://www.economist.com/the-world-this-week/rss.xml', 'The World This Week'],
+    // Financial Times
+    ['https://www.ft.com/rss/world', 'FT World'],
+    ['https://www.ft.com/rss/business', 'FT Business'],
+    ['https://www.ft.com/rss/companies', 'FT Companies'],
+    // Bloomberg
+    ['https://feeds.bloomberg.com/markets/news.rss', 'Bloomberg Markets'],
+    ['https://feeds.bloomberg.com/politics/news.rss', 'Bloomberg Politics'],
+    // The Guardian
+    ['https://www.theguardian.com/world/rss', 'Guardian World'],
+    ['https://www.theguardian.com/politics/rss', 'Guardian Politics'],
+    ['https://www.theguardian.com/technology/rss', 'Guardian Tech'],
+    ['https://www.theguardian.com/business/rss', 'Guardian Business'],
+    ['https://www.theguardian.com/us/technology/rss', 'Guardian US Tech'],
+    // US News sources
+    ['https://abcnews.com/abcnews/usheadlines', 'ABC News'],
+    ['https://feeds.npr.org/1004/rss.xml', 'NPR'],
+    // DW (German)
+    ['https://rss.dw.com/rdf/rss-en-all', 'DW World'],
+    // France 24
+    ['https://www.france24.com/en/rss', 'France 24'],
+    // NHK World
+    ['https://www3.nhk.or.jp/rss/news/cat0.xml', 'NHK World'],
+    // Geopolitics/International Relations
+    ['https://foreignpolicy.com/feed', 'Foreign Policy'],
+    ['https://thediplomat.com/feed', 'The Diplomat'],
+    ['https://www.foreignaffairs.com/rss', 'Foreign Affairs'],
+    ['https://www.project-syndicate.org/rss', 'Project Syndicate'],
+    ['https://euobserver.com/rss', 'EUobserver'],
+    ['https://www.euractiv.com/rss', 'Euractiv'],
+    // Think tank source
+    ['https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.fdd.org%2Ffeed%2F', 'FDD'],
+    ['https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.csis.org%2Fanalysis%2Frss', 'CSIS'],
+    ['https://api.rss2json.com/v1/api.json?rss_url=https%3A%2F%2Fwww.rand.org%2Frss%2Fresearch.html', 'RAND'],
   ];
 
   const results = await Promise.allSettled(
     feeds.map(([url, source]) => fetchRSS(url, source))
   );
 
+  // Log results by source
+  const sourceStats = {};
+  results.forEach((result, i) => {
+    const source = feeds[i][1];
+    if (result.status === 'fulfilled') {
+      const count = result.value.length;
+      sourceStats[source] = count;
+    } else {
+      sourceStats[source] = 0;
+    }
+  });
+  console.error('[RSS] Items by source:', sourceStats);
+
   const allNews = results
     .filter(r => r.status === 'fulfilled')
     .flatMap(r => r.value);
 
-  // De-duplicate and geo-tag
+  console.error(`[RSS] Total items fetched: ${allNews.length}`);
+
+  // De-duplicate (use first 50 chars for better matching)
   const seen = new Set();
-  const geoNews = [];
+  const uniqueNews = [];
   for (const item of allNews) {
-    const key = item.title.substring(0, 40).toLowerCase();
+    const key = item.title.substring(0, 50).toLowerCase().replace(/\s+/g, ' ');
     if (seen.has(key)) continue;
     seen.add(key);
+    uniqueNews.push(item);
+  }
+
+  console.error(`[RSS] After deduplication: ${uniqueNews.length}`);
+
+  // Create geo-tagged subset for map (only items with geo keywords)
+  const geoNews = [];
+  for (const item of uniqueNews) {
     const geo = geoTagText(item.title);
     if (geo) {
       geoNews.push({
@@ -162,8 +330,49 @@ export async function fetchAllNews() {
     }
   }
 
+  console.error(`[RSS] Geo-tagged for map: ${geoNews.length}`);
+
+  // Sort all news (not just geo-tagged) by date
+  uniqueNews.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
   geoNews.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
-  return geoNews.slice(0, 50);
+
+  // Fetch earthquake data (separate call, not dependent on RSS)
+  const earthquakes = await fetchEarthquakes();
+
+  // Add earthquakes to both feed (for ticker) and map (for visualization)
+  // Earthquakes have precise coordinates, no need for random offset
+  const earthquakesForMap = earthquakes.map(eq => ({
+    title: eq.title,
+    source: eq.source,
+    date: eq.date,
+    url: eq.url,
+    lat: eq.lat,
+    lon: eq.lon,
+    region: eq.region,
+    // Earthquake-specific display properties
+    type: eq.type,
+    urgent: eq.urgent,
+    mag: eq.mag,
+    depth: eq.depth,
+    tsunami: eq.tsunami
+  }));
+
+  // Combine geo-tagged news with earthquakes for map display
+  const allGeoItems = [...geoNews, ...earthquakesForMap];
+  allGeoItems.sort((a, b) => {
+    // Urgent items first, then by date
+    if (b.urgent !== a.urgent) return b.urgent ? 1 : -1;
+    return new Date(b.date || 0) - new Date(a.date || 0);
+  });
+
+  console.error(`[News] Total map items (news + earthquakes): ${allGeoItems.length}`);
+
+  // Return: all news for ticker, combined geo-tagged items for map
+  return {
+    all: uniqueNews.slice(0, 200), // More items for ticker
+    geo: allGeoItems.slice(0, 150), // Combined news + earthquakes for map
+    earthquakes: earthquakes.slice(0, 50) // Separate earthquakes array for detailed view
+  };
 }
 
 // === Leverageable Ideas from Signals ===
@@ -635,18 +844,20 @@ export async function synthesize(data) {
     meta: data.crucix, air, thermal, tSignals, chokepoints, nuke, nukeSignals,
     sdr: { total: sdrNet.totalReceivers || 0, online: sdrNet.online || 0, zones: sdrZones },
     tg: { posts: tgData.totalPosts || 0, urgent: tgUrgent, topPosts: tgTop },
-    who, fred, energy, bls, treasury, gscpi, defense, noaa, acled, gdelt, wallstreetcn, eastmoney, space, health, news,
+    who, fred, energy, bls, treasury, gscpi, defense, noaa, acled, gdelt, wallstreetcn, eastmoney, space, health, news: news.geo, // Geo-tagged for map
     markets, // Live Yahoo Finance market data
     ideas: [], ideasSource: 'disabled',
-    // newsFeed for ticker (merged RSS + GDELT + Telegram + WallStreetCN + EastMoney)
-    newsFeed: buildNewsFeed(news, gdeltData, tgUrgent, tgTop, wscnData, emData),
+    // newsFeed for ticker (merged RSS + GDELT + Telegram + WallStreetCN + EastMoney + Earthquakes)
+    newsFeed: buildNewsFeed(news.all, gdeltData, tgUrgent, tgTop, wscnData, emData, news.earthquakes || []), // All news for ticker
+    // Separate earthquakes array for detailed earthquake view
+    earthquakes: news.earthquakes || [],
   };
 
   return V2;
 }
 
 // === Unified News Feed for Ticker ===
-function buildNewsFeed(rssNews, gdeltData, tgUrgent, tgTop, wscnData, emData) {
+function buildNewsFeed(rssNews, gdeltData, tgUrgent, tgTop, wscnData, emData, earthquakes = []) {
   const feed = [];
 
   // RSS news
@@ -716,9 +927,29 @@ function buildNewsFeed(rssNews, gdeltData, tgUrgent, tgTop, wscnData, emData) {
     });
   }
 
-  // Sort by timestamp descending, limit to 50
-  feed.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
-  return feed.slice(0, 50);
+  // Earthquakes (USGS) - add significant earthquakes to feed
+  for (const eq of earthquakes.slice(0, 15)) {
+    feed.push({
+      headline: eq.title,
+      source: eq.source,
+      type: 'earthquake',
+      timestamp: eq.date,
+      region: eq.region || 'Global',
+      urgent: eq.urgent || false,
+      url: eq.url,
+      // Extra earthquake data for display
+      mag: eq.mag,
+      depth: eq.depth,
+      tsunami: eq.tsunami
+    });
+  }
+
+  // Sort by timestamp descending, prioritize urgent items
+  feed.sort((a, b) => {
+    if (b.urgent !== a.urgent) return b.urgent ? 1 : -1;
+    return new Date(b.timestamp || 0) - new Date(a.timestamp || 0);
+  });
+  return feed.slice(0, 120); // Increased limit to accommodate earthquakes
 }
 
 // === CLI Mode: inject into HTML file ===
@@ -741,9 +972,14 @@ async function cliInject() {
   console.log('Size:', json.length, 'bytes | Air:', V2.air.length, '| Thermal:', V2.thermal.length,
     '| News:', V2.news.length, '| Ideas:', V2.ideas.length, '| Sources:', V2.health.length);
 
+  // Log earthquake and RSS statistics
+  console.log('[RSS] Total feeds: 32 (BBC, NYT, Al Jazeera, Guardian, Bloomberg, FT, Economist, etc.)');
+  console.log('[Earthquakes] USGS M4.5+:', V2.earthquakes?.length || 0, 'events (past week)');
+
   const htmlPath = join(ROOT, 'dashboard/public/jarvis.html');
   let html = readFileSync(htmlPath, 'utf8');
-  html = html.replace(/^(let|const) D = .*;\s*$/m, 'let D = ' + json + ';');
+  // Replace let D = null; with actual data
+  html = html.replace('let D = null;', 'let D = ' + json + ';');
   writeFileSync(htmlPath, html);
   console.log('Data injected into jarvis.html!');
 

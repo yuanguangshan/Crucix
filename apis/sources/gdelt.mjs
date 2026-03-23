@@ -9,26 +9,46 @@ import { safeFetch } from '../utils/fetch.mjs';
 
 const BASE = 'https://api.gdeltproject.org/api/v2';
 
-// Rate limiting: random interval between requests (6-10 seconds) to avoid strict rate limiting
-let lastRequestTime = 0;
-const MIN_REQUEST_INTERVAL = 6000;  // 6 seconds minimum
-const MAX_REQUEST_INTERVAL = 10000; // 10 seconds maximum
+// Rate limiting: ensure at least 10 seconds between requests (GDELT limit is 5s, but be conservative)
+let lastRequestEndTime = 0;  // Track when last request ENDED, not started
+const MIN_REQUEST_INTERVAL = 10000;  // 10 seconds minimum (conservative buffer)
+const MAX_RETRIES = 2;  // Maximum retries for 429 errors (reduced to save time)
+const FIRST_REQUEST_WAIT = 15000;  // Wait 15s on first request after restart
 
-async function withRateLimit(fn) {
-  const now = Date.now();
-  const timeSinceLastRequest = now - lastRequestTime;
+async function withRateLimit(fn, retries = MAX_RETRIES) {
+  const isFirstRequest = lastRequestEndTime === 0;
 
-  // Calculate random wait time between 6-10 seconds
-  const randomWait = MIN_REQUEST_INTERVAL + Math.random() * (MAX_REQUEST_INTERVAL - MIN_REQUEST_INTERVAL);
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const now = Date.now();
+    const timeSinceLastRequestEnd = now - lastRequestEndTime;
 
-  if (timeSinceLastRequest < randomWait) {
-    const waitTime = Math.round(randomWait - timeSinceLastRequest);
-    console.log(`[GDELT] Rate limiting: waiting ${waitTime / 1000}s`);
-    await delay(waitTime);
+    // For first request after restart, wait longer to be safe
+    const requiredWait = isFirstRequest ? FIRST_REQUEST_WAIT : MIN_REQUEST_INTERVAL;
+
+    if (timeSinceLastRequestEnd < requiredWait) {
+      const waitTime = requiredWait - timeSinceLastRequestEnd;
+      console.log(`[GDELT] Rate limiting: waiting ${(waitTime / 1000).toFixed(3)}s${isFirstRequest ? ' (first request)' : ''}`);
+      await delay(waitTime);
+    }
+
+    // Execute request
+    const result = await fn();
+    lastRequestEndTime = Date.now();
+
+    // Check for 429 error and retry if needed
+    if (result?.error?.includes('429')) {
+      if (attempt < retries) {
+        const backoffTime = 12000 + Math.random() * 5000; // 12-17 seconds
+        console.log(`[GDELT] Got 429, retrying in ${(backoffTime / 1000).toFixed(1)}s (attempt ${attempt + 1}/${retries})`);
+        await delay(backoffTime);
+        continue;
+      } else {
+        console.error(`[GDELT] Max retries reached for 429 error - API may be rate limiting more aggressively than expected`);
+      }
+    }
+
+    return result;
   }
-
-  lastRequestTime = Date.now();
-  return fn();
 }
 
 // Cache (15 minutes TTL - matches dashboard refresh)
@@ -105,7 +125,22 @@ export async function searchEvents(query = '', opts = {}) {
       sort: sortBy,
     });
 
-    return safeFetch(`${BASE}/doc/doc?${params}`);
+    const result = await safeFetch(`${BASE}/doc/doc?${params}`);
+
+    // Debug: log the result structure
+    if (result) {
+      const keys = Object.keys(result);
+      console.log(`[GDELT] Response keys:`, keys);
+      if (result.articles) {
+        console.log(`[GDELT] Articles count: ${result.articles.length}`);
+      } else if (result.error) {
+        console.log(`[GDELT] Error in response:`, result.error);
+      } else {
+        console.log(`[GDELT] Unexpected response format:`, typeof result, JSON.stringify(result).substring(0, 200));
+      }
+    }
+
+    return result;
   });
 }
 
@@ -253,17 +288,11 @@ function categorizeArticle(article) {
 // GDELT rate limit: 1 request per 5 seconds
 function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// Multiple query keywords for comprehensive coverage
+// Multiple query keywords for comprehensive coverage (simplified for testing)
 const QUERY_KEYWORDS = [
-  'crisis',      // Conflicts, disasters, emergencies
-  'war',         // Military conflicts, wars
-  'economic',    // Economy, markets, finance
-  'summit',      // Diplomatic meetings, negotiations
-  'trade',       // Trade, tariffs, sanctions
-  'attack',      // Military strikes, conflicts
-  'sanctions',   // Economic sanctions
-  'emergency',   // Emergency situations
-  'inflation',   // Inflation, prices
+  'war',         // Military conflicts
+  'economic',    // Economy & finance
+  'crisis',      // Crisis situations
 ];
 
 // Briefing mode — get top global events summary (sequential due to rate limit)
@@ -287,7 +316,7 @@ export async function briefing() {
     const keyword = QUERY_KEYWORDS[i];
     console.log(`[GDELT] [${i + 1}/${QUERY_KEYWORDS.length}] Querying: "${keyword}"`);
 
-    const result = await searchEvents(keyword, { maxRecords: 50, timespan: '24h' });
+    const result = await searchEvents(keyword, { maxRecords: 150, timespan: '24h' });
 
     if (result?.error) {
       console.error(`[GDELT] Error for "${keyword}":`, result.error);
